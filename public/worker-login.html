@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Worker Login - Jamison Protection</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main style="padding: 40px; max-width: 500px; margin: auto;">
+    <h2>Worker Login</h2>
+    <form onsubmit="return loginUser(event)">
+      <label for="username">Username</label><br>
+      <input type="text" id="username" required><br><br>
+
+      <label for="password">Password</label><br>
+      <input type="password" id="password" required><br><br>
+
+      <button type="submit">Login</button>
+    </form>
+    <p id="login-error" style="color: red;"></p>
+  </main>
+  <script src="js/portal.js"></script>
+</body>
+</html>
+ 

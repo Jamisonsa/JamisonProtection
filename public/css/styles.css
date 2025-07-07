@@ -1,0 +1,94 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  background-color: #111;
+  color: #eee;
+}
+
+header {
+  background-color: #1c1c1c;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+nav a {
+  color: #f2c744;
+  margin: 0 15px;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.hero {
+  padding: 60px 20px;
+  text-align: center;
+  background: linear-gradient(to right, #1c1c1c, #333);
+  color: #f2c744;
+}
+
+.btn {
+  background-color: #f2c744;
+  padding: 10px 20px;
+  color: #111;
+  border: none;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 5px;
+  display: inline-block;
+  margin-top: 20px;
+}
+
+footer {
+  background: #1c1c1c;
+  color: #aaa;
+  text-align: center;
+  padding: 15px;
+  margin-top: 60px;
+}
+
+/* 💡 New: Style for content boxes */
+.info-box {
+  background-color: #1c1c1c;
+  color: #eee;
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 250px;
+  flex: 1;
+}
+.logout-btn, .switch-btn {
+  position: absolute;
+  top: 20px;
+  padding: 8px 12px;
+  background: #444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.logout-btn {
+  right: 20px;
+}
+.switch-btn {
+  left: 20px;
+}
+.admin-btn {
+  position: absolute;
+  top: 70px;
+  right: 20px;
+  padding: 8px 14px;
+  background: #e63946;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.admin-btn {
+  background-color: #e63946;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+

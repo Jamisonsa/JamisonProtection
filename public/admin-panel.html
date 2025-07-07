@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel | Jamison Protection</title>
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 30px;
+      max-width: 800px;
+      margin: auto;
+    }
+    input, select {
+      padding: 10px;
+      width: 100%;
+      margin-top: 10px;
+      background: #1f1f1f;
+      color: white;
+      border: none;
+    }
+    button {
+      background: #e63946;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 10px;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .user-box {
+      background: #1f1f1f;
+      margin-top: 20px;
+      padding: 10px;
+      border-left: 5px solid #e63946;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+
+  <h2>Add New User</h2>
+  <form id="addUserForm">
+    <input type="text" id="newUsername" placeholder="Username" required>
+    <input type="text" id="newPassword" placeholder="Password" required>
+    <select id="newRole">
+      <option value="worker">Worker</option>
+      <option value="owner">Owner</option>
+    </select>
+    <button type="submit">Add User</button>
+  </form>
+
+  <h2>All Users</h2>
+  <div id="userList"></div>
+
+  <script>
+    const fs = require('fs');
+
+app.get('/admin-panel.html', isOwner, (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'admin-panel.html');
+  fs.readFile(filePath, 'utf8', (err, html) => {
+    if (err) return res.status(500).send('Error loading admin panel');
+    res.send(html);
+  });
+});
+
+    async function fetchUsers() {
+      const res = await fetch('/api/users');
+      const users = await res.json();
+      const list = document.getElementById('userList');
+      list.innerHTML = '';
+
+      users.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'user-box';
+        div.innerHTML = `
+          <strong>${user.username}</strong> (${user.role})<br>
+          <button onclick="deleteUser('${user._id}')">Delete</button>
+          <button onclick="resetPassword('${user._id}')">Reset Password</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    async function deleteUser(id) {
+      if (confirm('Are you sure you want to delete this user?')) {
+        await fetch('/api/users/' + id, { method: 'DELETE' });
+        fetchUsers();
+      }
+    }
+
+    async function resetPassword(id) {
+      const newPass = prompt('Enter new password:');
+      if (newPass) {
+        await fetch('/api/users/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPass })
+        });
+        alert('Password reset.');
+      }
+    }
+
+    document.getElementById('addUserForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = document.getElementById('newUsername').value;
+      const password = document.getElementById('newPassword').value;
+      const role = document.getElementById('newRole').value;
+
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role })
+      });
+
+      e.target.reset();
+      fetchUsers();
+    });
+
+    fetchUsers();
+  </script>
+</body>
+</html>
