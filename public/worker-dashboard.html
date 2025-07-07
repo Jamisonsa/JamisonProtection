@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Worker Dashboard | Jamison Protection</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #121212;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #1c1c1c;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 10px;
+    }
+    section {
+      max-width: 800px;
+      margin: auto;
+      padding: 30px;
+    }
+    .shift {
+      background: #1f1f1f;
+      margin: 15px 0;
+      padding: 15px;
+      border-left: 5px solid #e63946;
+      color: #ffffff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    button {
+      background: #e63946;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin-top: 10px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .logout-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #444;
+    }
+    form {
+      background: #1f1f1f;
+      padding: 20px;
+      margin-top: 40px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      border-left: 5px solid #e63946;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      background: #2a2a2a;
+      color: white;
+      border: none;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Worker Dashboard</h1>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <button class="switch-btn" onclick="switchToOwner()">Switch to Owner View</button>
+
+  </header>
+
+  <section>
+    <h2>Available Shifts</h2>
+    <div id="shiftList"></div>
+
+    <h2>Log Hours</h2>
+    <form id="logForm">
+      <input type="date" id="logDate" required>
+      <input type="number" id="logHours" placeholder="Hours Worked" min="0.5" step="0.5" required>
+      <input type="description" id="logdescription" placeholder="Description of Event" required>
+      <button type="submit">Submit Hours</button>
+    </form>
+  </section>
+
+  <script>
+    async function loadShifts() {
+      const res = await fetch('/api/shifts');
+      if (res.status === 401) return location.href = 'login.html';
+
+      const shifts = await res.json();
+      const container = document.getElementById('shiftList');
+      container.innerHTML = shifts.length === 0
+        ? '<p>No available shifts.</p>'
+        : '';
+
+      shifts.forEach(shift => {
+        const div = document.createElement('div');
+        div.className = 'shift';
+        div.innerHTML = `
+          <strong>${shift.date} at ${shift.time}</strong><br>
+          Location: ${shift.location}<br>
+          Notes: ${shift.notes || 'None'}<br>
+          <button onclick="claimShift('${shift._id}')">Claim Shift</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function claimShift(id) {
+      const res = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shiftId: id })
+      });
+      const data = await res.json();
+      alert(data.message);
+      loadShifts();
+    }
+
+    async function logout() {
+      await fetch('/logout', { method: 'POST' });
+      location.href = 'login.html';
+    }
+
+    document.getElementById('logForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const date = document.getElementById('logDate').value;
+      const hours = document.getElementById('logHours').value;
+
+      const res = await fetch('/api/log-hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, hours })
+      });
+
+      const data = await res.json();
+      alert(data.message);
+      e.target.reset();
+    });
+
+    loadShifts();
+    function switchToOwner() {
+  fetch('/api/switch-to-owner', { method: 'POST' })
+    .then(res => res.ok ? location.href = 'owner-panel.html' : alert('Only the owner can switch back.'));
+}
+
+  </script>
+  
+</body>
+</html>

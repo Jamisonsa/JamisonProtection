@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - Jamison Protection</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    main {
+      max-width: 400px;
+      margin: 80px auto;
+      background-color: #1c1c1c;
+      padding: 30px;
+      border-radius: 8px;
+      color: #eee;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    label {
+      margin-top: 15px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <main>
+    <h2 style="color: #f2c744; text-align: center;">Login</h2>
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input type="text" id="username" required />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" required />
+
+      <button type="submit">Login</button>
+    </form>
+
+    <p id="loginMessage" style="color: red; margin-top: 15px;"></p>
+  </main>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  const response = await fetch('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await response.json();
+  if (response.ok) {
+    if (data.role === 'owner') {
+      window.location.href = 'owner-panel.html';
+    } else {
+      window.location.href = 'worker-dashboard.html';
+    }
+  } else {
+    alert(data.message || 'Login failed');
+  }
+});
+</script>
+
+</body>
+</html>

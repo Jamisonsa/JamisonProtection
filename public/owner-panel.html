@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Owner Panel | Jamison Protection</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #121212;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #1c1c1c;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .logout-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #444;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    main {
+      max-width: 900px;
+      margin: auto;
+      padding: 30px;
+    }
+    form {
+      margin-bottom: 30px;
+      background: #1f1f1f;
+      padding: 20px;
+      border-left: 5px solid #e63946;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    input, textarea {
+      background: #2a2a2a;
+      color: white;
+      border: none;
+      padding: 10px;
+      margin: 8px 0;
+      width: 100%;
+    }
+    button {
+      background: #e63946;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .shift {
+      background: #1f1f1f;
+      margin: 15px 0;
+      padding: 15px;
+      border-left: 5px solid #1c1c1c;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Owner Panel</h1>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <button class="switch-btn" onclick="switchToWorker()">Switch to Worker View</button>
+<button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
+<button onclick="loadLogs()" class="admin-btn">View Submitted Hours</button>
+
+<div id="logContainer" style="margin-top: 20px;"></div>
+
+
+  </header>
+  <main>
+    <h2>Post New Shift</h2>
+    <form id="postShiftForm">
+      <input type="date" id="date" required>
+      <input type="time" id="time" required>
+      <input type="text" id="location" placeholder="Location" required>
+      <textarea id="notes" placeholder="Notes (optional)"></textarea>
+      <button type="submit">Post Shift</button>
+    </form>
+
+    <h2>All Shifts</h2>
+    <div id="shiftList"></div>
+  </main>
+
+  <script>
+    async function loadShifts() {
+      const res = await fetch('/api/view-all-shifts');
+      if (res.status === 401) return location.href = 'login.html';
+
+      const shifts = await res.json();
+      const container = document.getElementById('shiftList');
+      container.innerHTML = '';
+
+      shifts.forEach(shift => {
+        const div = document.createElement('div');
+        div.className = 'shift';
+        div.innerHTML = `
+          <strong>${shift.date} at ${shift.time}</strong><br>
+          Location: ${shift.location}<br>
+          Notes: ${shift.notes || 'None'}<br>
+          Claimed by: ${shift.claimedBy || 'Not claimed yet'}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    document.getElementById('postShiftForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const date = document.getElementById('date').value;
+      const time = document.getElementById('time').value;
+      const location = document.getElementById('location').value;
+      const notes = document.getElementById('notes').value;
+
+      const res = await fetch('/api/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, time, location, notes })
+      });
+
+      const data = await res.json();
+      alert(data.message);
+      loadShifts();
+      e.target.reset();
+    });
+
+    function logout() {
+      fetch('/logout', { method: 'POST' }).then(() => location.href = 'login.html');
+    }
+
+    loadShifts();
+  </script>
+  <script>
+  function switchToWorker() {
+    fetch('/api/switch-to-worker', { method: 'POST' })
+      .then(res => res.ok ? location.href = 'worker-dashboard.html' : alert('Switch failed'));
+  }
+</script>
+<script>
+function goToAdmin() {
+  fetch('/api/verify-owner')
+    .then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'))
+}
+</script>
+<script>
+function loadLogs() {
+  fetch('/api/view-logs')
+    .then(res => res.json())
+    .then(logs => {
+      const container = document.getElementById('logContainer');
+      if (logs.length === 0) {
+        container.innerHTML = '<p>No logs found.</p>';
+        return;
+      }
+
+      let html = `
+        <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 20px; width: 100%;">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Date</th>
+              <th>Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      logs.forEach(log => {
+        html += `<tr>
+          <td>${log.username}</td>
+          <td>${log.date}</td>
+          <td>${log.hours}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Failed to load logs');
+    });
+}
+</script>
+<script>
+function switchToWorker() {
+  fetch('/api/switch-to-worker', {
+    method: 'POST',
+    credentials: 'include'
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const text = await res.text(); // fallback to text if not JSON
+        throw new Error(text.includes('<!DOCTYPE') ? 'Invalid session or route' : text);
+      }
+      return res.json();
+    })
+    .then(() => {
+      window.location.href = 'worker-dashboard.html';
+    })
+    .catch(err => {
+      alert('Switch failed: ' + err.message);
+      console.error(err);
+    });
+}
+</script>
+
+</body>
+</html>
