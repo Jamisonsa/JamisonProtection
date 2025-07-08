@@ -145,8 +145,11 @@
 </script>
 <script>
 function goToAdmin() {
-  fetch('/api/verify-owner')
-    .then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'))
+fetch('/api/verify-owner', {
+  method: 'GET',
+  credentials: 'include'  // This is required for session cookies to be sent!
+})
+.then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'))
 }
 </script>
 <script>
