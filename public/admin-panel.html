@@ -105,6 +105,24 @@
         credentials: 'include',
         body: JSON.stringify({ username, password, role })
       });
+      await fetch('/api/users/' + id, {
+  method: 'DELETE',
+  credentials: 'include'
+});
+
+await fetch('/api/users/' + id, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify({ password: newPass })
+});
+await fetch('/api/users', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include',
+  body: JSON.stringify({ username, password, role })
+});
+
 
       e.target.reset();
       fetchUsers();
