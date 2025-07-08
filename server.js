@@ -64,10 +64,11 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // only secure in production
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // allow cross-site cookies on render
+    secure: true,          // ✅ Force HTTPS-only cookie (Render uses HTTPS)
+    sameSite: 'none'       // ✅ Allow cross-site cookies from frontend to backend
   }
 }));
+
 
 
 // ────── Middleware ──────
