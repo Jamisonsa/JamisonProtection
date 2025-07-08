@@ -30,8 +30,10 @@ const Shift = mongoose.model('Shift', new mongoose.Schema({
 const Log = mongoose.model('Log', new mongoose.Schema({
   username: String,
   date: String,
-  hours: Number
+  hours: Number,
+  description: String   
 }));
+
 
 const User = mongoose.model('User', new mongoose.Schema({
   username: String,
@@ -175,7 +177,7 @@ app.post('/logout', (req, res) => {
 
 // ────── Shift Routes ──────
 app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
-  const { date, time, location, notes } = req.body;
+  const { date, time, starttime, endtime, location, notes } = req.body;
   const shift = new Shift({ date, time, location, notes });
   await shift.save();
   res.json({ message: 'Shift posted' });
@@ -203,8 +205,8 @@ app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
 
 // ────── Log Hours ──────
 app.post('/api/log-hours', requireLogin, isWorker, async (req, res) => {
-  const { date, hours } = req.body;
-  await Log.create({ username: req.session.user, date, hours });
+  const { date, hours, description } = req.body;
+  await Log.create({ username: req.session.user, date, hours, description });
   res.json({ message: 'Hours logged' });
 });
 
@@ -212,6 +214,14 @@ app.get('/api/view-logs', requireLogin, isOwner, async (_req, res) => {
   const logs = await Log.find();
   res.json(logs);
 });
+app.get('/api/logs-by-date', requireLogin, isOwner, async (req, res) => {
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ message: 'Date is required' });
+
+  const logs = await Log.find({ date });
+  res.json(logs);
+});
+
 
 // ────── Admin Panel ──────
 app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {

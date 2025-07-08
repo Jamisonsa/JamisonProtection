@@ -39,6 +39,21 @@
 </head>
 <body>
   <h1>Admin Panel</h1>
+<h2>View Logs by Date</h2>
+<input type="date" id="filterDate">
+<button onclick="filterLogs()">Search</button>
+
+<table id="logTable" border="1" style="width:100%; margin-top: 10px;">
+  <thead>
+    <tr>
+      <th>User</th>
+      <th>Date</th>
+      <th>Hours</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody id="logBody"></tbody>
+</table>
 
   <h2>Add New User</h2>
   <form id="addUserForm">
@@ -105,25 +120,32 @@
         credentials: 'include',
         body: JSON.stringify({ username, password, role })
       });
-      await fetch('/api/users/' + id, {
-  method: 'DELETE',
-  credentials: 'include'
-});
-
-
-await fetch('/api/users', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  credentials: 'include',
-  body: JSON.stringify({ username, password, role })
-});
-
 
       e.target.reset();
       fetchUsers();
     });
 
     fetchUsers();
+    async function filterLogs() {
+  const date = document.getElementById('filterDate').value;
+  const res = await fetch('/api/logs-by-date?date=' + date, { credentials: 'include' });
+  const logs = await res.json();
+
+  const tbody = document.getElementById('logBody');
+  tbody.innerHTML = '';
+  logs.forEach(log => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${log.username}</td>
+      <td>${log.date}</td>
+      <td>${log.hours}</td>
+      <td>${log.description || ''}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
   </script>
+  
 </body>
 </html>
