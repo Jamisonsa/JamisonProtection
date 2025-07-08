@@ -108,6 +108,30 @@ app.post('/api/switch-to-owner', (req, res) => {
   }
   return res.status(403).json({ message: 'Only owner can switch to owner' });
 });
+// ─── User Management (Admin Panel) ───
+app.get('/api/users', requireLogin, isOwner, async (_req, res) => {
+  const users = await User.find({}, '-password'); // omit passwords
+  res.json(users);
+});
+
+app.post('/api/users', requireLogin, isOwner, async (req, res) => {
+  const { username, password, role } = req.body;
+  const existing = await User.findOne({ username });
+  if (existing) return res.status(400).json({ message: 'User already exists' });
+  await User.create({ username, password, role });
+  res.json({ message: 'User created' });
+});
+
+app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ message: 'User deleted' });
+});
+
+app.put('/api/users/:id', requireLogin, isOwner, async (req, res) => {
+  const { password } = req.body;
+  await User.findByIdAndUpdate(req.params.id, { password });
+  res.json({ message: 'Password updated' });
+});
 
 // ────── Auth Middleware ──────
 function requireLogin(req, res, next) {
