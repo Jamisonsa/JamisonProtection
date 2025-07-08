@@ -109,16 +109,23 @@ app.post('/api/switch-to-owner', (req, res) => {
   return res.status(403).json({ message: 'Only owner can switch to owner' });
 });
 // ─── User Management (Admin Panel) ───
+// ─── Admin: Create, Delete, Update Users ───
 app.get('/api/users', requireLogin, isOwner, async (_req, res) => {
-  const users = await User.find({}, '-password'); // omit passwords
+  const users = await User.find({}, { password: 0 }); // hide password
   res.json(users);
 });
 
 app.post('/api/users', requireLogin, isOwner, async (req, res) => {
   const { username, password, role } = req.body;
-  const existing = await User.findOne({ username });
-  if (existing) return res.status(400).json({ message: 'User already exists' });
-  await User.create({ username, password, role });
+  if (!username || !password || !role) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  const exists = await User.findOne({ username });
+  if (exists) return res.status(400).json({ message: 'User already exists' });
+
+  const newUser = new User({ username, password, role });
+  await newUser.save();
   res.json({ message: 'User created' });
 });
 
@@ -129,9 +136,12 @@ app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
 
 app.put('/api/users/:id', requireLogin, isOwner, async (req, res) => {
   const { password } = req.body;
+  if (!password) return res.status(400).json({ message: 'Password required' });
+
   await User.findByIdAndUpdate(req.params.id, { password });
   res.json({ message: 'Password updated' });
 });
+
 
 // ────── Auth Middleware ──────
 function requireLogin(req, res, next) {
