@@ -71,7 +71,6 @@
     <button class="switch-btn" onclick="switchToWorker()">Switch to Worker View</button>
     <button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
     <button onclick="loadLogs()" class="admin-btn">View Submitted Hours</button>
-    <div id="logContainer" style="margin-top: 20px;"></div>
   </header>
 
   <main>
@@ -86,6 +85,8 @@
 
     <h2>All Shifts</h2>
     <div id="shiftList"></div>
+
+    <div id="logContainer" style="margin-top: 30px;"></div>
   </main>
 
   <script>
@@ -110,6 +111,52 @@
         `;
         container.appendChild(div);
       });
+    }
+
+    function loadLogs() {
+      const selectedDate = document.getElementById('filterDate')?.value;
+      const url = selectedDate ? `/api/logs-by-date?date=${selectedDate}` : '/api/view-logs';
+
+      fetch(url, { credentials: 'include' })
+        .then(res => res.json())
+        .then(logs => {
+          const container = document.getElementById('logContainer');
+          if (logs.length === 0) {
+            container.innerHTML = '<p>No logs found.</p>';
+            return;
+          }
+
+          let html = `
+            <h3>Submitted Hours</h3>
+            <input type="date" id="filterDate" onchange="loadLogs()" style="margin-bottom: 10px;" />
+            <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 10px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Date</th>
+                  <th>Hours</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          logs.forEach(log => {
+            html += `<tr>
+              <td>${log.username}</td>
+              <td>${log.date}</td>
+              <td>${log.hours}</td>
+              <td>${log.description || ''}</td>
+            </tr>`;
+          });
+
+          html += '</tbody></table>';
+          container.innerHTML = html;
+        })
+        .catch(err => {
+          console.error(err);
+          alert('Failed to load logs');
+        });
     }
 
     document.getElementById('postShiftForm').addEventListener('submit', async (e) => {
@@ -166,47 +213,6 @@
         credentials: 'include'
       })
         .then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'));
-    }
-
-    function loadLogs() {
-      fetch('/api/view-logs', {
-        credentials: 'include'
-      })
-        .then(res => res.json())
-        .then(logs => {
-          const container = document.getElementById('logContainer');
-          if (logs.length === 0) {
-            container.innerHTML = '<p>No logs found.</p>';
-            return;
-          }
-
-          let html = `
-            <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 20px; width: 100%;">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Date</th>
-                  <th>Hours</th>
-                </tr>
-              </thead>
-              <tbody>
-          `;
-
-          logs.forEach(log => {
-            html += `<tr>
-              <td>${log.username}</td>
-              <td>${log.date}</td>
-              <td>${log.hours}</td>
-            </tr>`;
-          });
-
-          html += '</tbody></table>';
-          container.innerHTML = html;
-        })
-        .catch(err => {
-          console.error(err);
-          alert('Failed to load logs');
-        });
     }
 
     loadShifts();
