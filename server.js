@@ -1,6 +1,6 @@
 // server.js
-require('dotenv').config();
 process.env.NODE_ENV = 'production';
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -191,3 +191,7 @@ app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+app.get('/debug-session', (req, res) => {
+  res.json(req.session);
+});
+
