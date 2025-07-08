@@ -186,12 +186,13 @@ app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
 app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
   return res.sendStatus(200);
 });
+app.get('/debug-session', (req, res) => {
+  res.json(req.session);
+});
 
 // ────── Start Server ──────
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-app.get('/debug-session', (req, res) => {
-  res.json(req.session);
-});
+
 
