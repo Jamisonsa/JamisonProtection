@@ -9,6 +9,10 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const cors = require('cors');
+
+
+
 
 // ────── MongoDB Connection ──────
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protection', {
@@ -50,13 +54,21 @@ async function seedUsers() {
   }
 }
 seedUsers();
-
+app.use(cors({
+  origin: 'https://jamisonprotection.onrender.com',
+  credentials: true
+}));
 // ────── Sessions ──────
 app.use(session({
   secret: 'jamison-secret-key',
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    sameSite: 'none'
+  }
 }));
+
 
 // ────── Middleware ──────
 app.use(bodyParser.json());
