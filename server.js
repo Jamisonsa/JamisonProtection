@@ -6,13 +6,10 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
-
-const app = express();
-const PORT = process.env.PORT;
 const cors = require('cors');
 
-
-
+const app = express();
+const PORT = process.env.PORT || 4000;
 
 // ────── MongoDB Connection ──────
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protection', {
@@ -54,18 +51,22 @@ async function seedUsers() {
   }
 }
 seedUsers();
+
+// ────── CORS ──────
 app.use(cors({
   origin: 'https://jamisonprotection.onrender.com',
   credentials: true
 }));
+
 // ────── Sessions ──────
 app.use(session({
   secret: 'jamison-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,
-    sameSite: 'none'
+    secure: process.env.NODE_ENV === 'production', // only secure in production
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // allow cross-site cookies on render
   }
 }));
 
@@ -73,6 +74,11 @@ app.use(session({
 // ────── Middleware ──────
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// ────── Static Files ──────
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ────── Session Debug ──────
 app.get('/api/session-debug', (req, res) => {
   res.json({
     user: req.session.user || null,
@@ -80,7 +86,7 @@ app.get('/api/session-debug', (req, res) => {
   });
 });
 
-// ────── Role Switch Route (Must go before static) ──────
+// ────── Role Switch Routes ──────
 app.post('/api/switch-to-worker', (req, res) => {
   if (req.session.user === 'owner') {
     req.session.role = 'worker';
@@ -96,9 +102,6 @@ app.post('/api/switch-to-owner', (req, res) => {
   }
   return res.status(403).json({ message: 'Only owner can switch to owner' });
 });
-
-// ────── Static Files ──────
-app.use(express.static(path.join(__dirname, 'public')));
 
 // ────── Auth Middleware ──────
 function requireLogin(req, res, next) {
@@ -170,7 +173,7 @@ app.get('/api/view-logs', requireLogin, isOwner, async (_req, res) => {
   res.json(logs);
 });
 
-// ────── Admin Panel (Optional) ──────
+// ────── Admin Panel ──────
 app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
   const filePath = path.join(__dirname, 'public', 'admin-panel.html');
   fs.readFile(filePath, 'utf8', (err, html) => {
@@ -179,7 +182,11 @@ app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
   });
 });
 
+app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
+  return res.sendStatus(200);
+});
+
 // ────── Start Server ──────
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });

@@ -69,13 +69,11 @@
     <h1>Owner Panel</h1>
     <button class="logout-btn" onclick="logout()">Logout</button>
     <button class="switch-btn" onclick="switchToWorker()">Switch to Worker View</button>
-<button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
-<button onclick="loadLogs()" class="admin-btn">View Submitted Hours</button>
-
-<div id="logContainer" style="margin-top: 20px;"></div>
-
-
+    <button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
+    <button onclick="loadLogs()" class="admin-btn">View Submitted Hours</button>
+    <div id="logContainer" style="margin-top: 20px;"></div>
   </header>
+
   <main>
     <h2>Post New Shift</h2>
     <form id="postShiftForm">
@@ -92,7 +90,9 @@
 
   <script>
     async function loadShifts() {
-      const res = await fetch('/api/view-all-shifts');
+      const res = await fetch('/api/view-all-shifts', {
+        credentials: 'include'
+      });
       if (res.status === 401) return location.href = 'login.html';
 
       const shifts = await res.json();
@@ -122,6 +122,7 @@
       const res = await fetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ date, time, location, notes })
       });
 
@@ -132,88 +133,83 @@
     });
 
     function logout() {
-      fetch('/logout', { method: 'POST' }).then(() => location.href = 'login.html');
+      fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      }).then(() => location.href = 'login.html');
+    }
+
+    function switchToWorker() {
+      fetch('/api/switch-to-worker', {
+        method: 'POST',
+        credentials: 'include'
+      })
+        .then(async res => {
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text.includes('<!DOCTYPE') ? 'Invalid session or route' : text);
+          }
+          return res.json();
+        })
+        .then(() => {
+          window.location.href = 'worker-dashboard.html';
+        })
+        .catch(err => {
+          alert('Switch failed: ' + err.message);
+          console.error(err);
+        });
+    }
+
+    function goToAdmin() {
+      fetch('/api/verify-owner', {
+        method: 'GET',
+        credentials: 'include'
+      })
+        .then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'));
+    }
+
+    function loadLogs() {
+      fetch('/api/view-logs', {
+        credentials: 'include'
+      })
+        .then(res => res.json())
+        .then(logs => {
+          const container = document.getElementById('logContainer');
+          if (logs.length === 0) {
+            container.innerHTML = '<p>No logs found.</p>';
+            return;
+          }
+
+          let html = `
+            <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 20px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Date</th>
+                  <th>Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          logs.forEach(log => {
+            html += `<tr>
+              <td>${log.username}</td>
+              <td>${log.date}</td>
+              <td>${log.hours}</td>
+            </tr>`;
+          });
+
+          html += '</tbody></table>';
+          container.innerHTML = html;
+        })
+        .catch(err => {
+          console.error(err);
+          alert('Failed to load logs');
+        });
     }
 
     loadShifts();
   </script>
-  <script>
-  function switchToWorker() {
-    fetch('/api/switch-to-worker', { method: 'POST' })
-      .then(res => res.ok ? location.href = 'worker-dashboard.html' : alert('Switch failed'));
-  }
-</script>
-<script>
-function goToAdmin() {
-fetch('/api/verify-owner', {
-  method: 'GET',
-  credentials: 'include'  // This is required for session cookies to be sent!
-})
-.then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'))
-}
-</script>
-<script>
-function loadLogs() {
-  fetch('/api/view-logs')
-    .then(res => res.json())
-    .then(logs => {
-      const container = document.getElementById('logContainer');
-      if (logs.length === 0) {
-        container.innerHTML = '<p>No logs found.</p>';
-        return;
-      }
-
-      let html = `
-        <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 20px; width: 100%;">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Date</th>
-              <th>Hours</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      logs.forEach(log => {
-        html += `<tr>
-          <td>${log.username}</td>
-          <td>${log.date}</td>
-          <td>${log.hours}</td>
-        </tr>`;
-      });
-
-      html += '</tbody></table>';
-      container.innerHTML = html;
-    })
-    .catch(err => {
-      console.error(err);
-      alert('Failed to load logs');
-    });
-}
-</script>
-<script>
-function switchToWorker() {
-  fetch('/api/switch-to-worker', {
-    method: 'POST',
-    credentials: 'include'
-  })
-    .then(async res => {
-      if (!res.ok) {
-        const text = await res.text(); // fallback to text if not JSON
-        throw new Error(text.includes('<!DOCTYPE') ? 'Invalid session or route' : text);
-      }
-      return res.json();
-    })
-    .then(() => {
-      window.location.href = 'worker-dashboard.html';
-    })
-    .catch(err => {
-      alert('Switch failed: ' + err.message);
-      console.error(err);
-    });
-}
-</script>
-
 </body>
 </html>

@@ -24,6 +24,11 @@
       margin-top: 15px;
       display: block;
     }
+    #loginMessage {
+      color: red;
+      margin-top: 15px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -40,34 +45,36 @@
       <button type="submit">Login</button>
     </form>
 
-    <p id="loginMessage" style="color: red; margin-top: 15px;"></p>
+    <p id="loginMessage"></p>
   </main>
 
-<script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const messageBox = document.getElementById('loginMessage');
 
-  const response = await fetch('/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // 🔐 Needed for Render sessions
+        body: JSON.stringify({ username, password })
+      });
 
-  const data = await response.json();
-  if (response.ok) {
-    if (data.role === 'owner') {
-      window.location.href = 'owner-panel.html';
-    } else {
-      window.location.href = 'worker-dashboard.html';
-    }
-  } else {
-    alert(data.message || 'Login failed');
-  }
-});
-</script>
+      const data = await response.json();
+      if (response.ok) {
+        if (data.role === 'owner') {
+          window.location.href = 'owner-panel.html';
+        } else {
+          window.location.href = 'worker-dashboard.html';
+        }
+      } else {
+        messageBox.textContent = data.message || 'Login failed. Please try again.';
+      }
+    });
+  </script>
 
 </body>
 </html>
