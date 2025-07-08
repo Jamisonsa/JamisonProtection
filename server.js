@@ -60,15 +60,20 @@ app.use(cors({
 }));
 
 // ────── Sessions ──────
+app.set('trust proxy', 1); // ✅ Required for secure cookies on Render (behind proxy)
+
 app.use(session({
+  name: 'connect.sid',
   secret: 'jamison-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,          // ✅ Force HTTPS-only cookie (Render uses HTTPS)
-    sameSite: 'none'       // ✅ Allow cross-site cookies from frontend to backend
+    secure: true,             // ✅ Required for HTTPS-only cookies on Render
+    sameSite: 'none',         // ✅ Required for cross-site cookie with frontend/backend split
+    httpOnly: true
   }
 }));
+
 
 
 
