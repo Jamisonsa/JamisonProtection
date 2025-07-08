@@ -186,9 +186,15 @@ app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
 app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
   return res.sendStatus(200);
 });
-app.get('/debug-session', (req, res) => {
-  res.json(req.session);
+// ─── Debug Session Route ───
+app.get('/api/debug-session', (req, res) => {
+  res.json({
+    user: req.session.user || null,
+    role: req.session.role || null,
+    fullSession: req.session
+  });
 });
+
 
 // ────── Start Server ──────
 app.listen(PORT, () => {
