@@ -99,7 +99,7 @@ app.get('/api/session-debug', (req, res) => {
 
 // ────── Role Switch Routes ──────
 app.post('/api/switch-to-worker', (req, res) => {
-  if (req.session.user === 'owner') {
+  if (req.session.role === 'owner') {
     req.session.role = 'worker';
     return res.status(200).json({ message: 'Switched to worker' });
   }
@@ -107,7 +107,7 @@ app.post('/api/switch-to-worker', (req, res) => {
 });
 
 app.post('/api/switch-to-owner', (req, res) => {
-  if (req.session.user === 'owner') {
+  if (req.session.role === 'owner') {
     req.session.role = 'owner';
     return res.status(200).json({ message: 'Switched to owner' });
   }
