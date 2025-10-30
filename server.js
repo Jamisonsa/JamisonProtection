@@ -98,21 +98,29 @@ app.get('/api/session-debug', (req, res) => {
 });
 
 // ────── Role Switch Routes ──────
+
+// Allow owner to switch viewing mode
 app.post('/api/switch-to-worker', (req, res) => {
-  if (req.session.role === 'owner') {
-    req.session.role = 'worker';
-    return res.status(200).json({ message: 'Switched to worker' });
-  }
-  return res.status(403).json({ message: 'Only owner can switch to worker' });
+    if (req.session.role !== 'owner') {
+        return res.status(403).json({ message: 'Only owner can switch to worker view' });
+    }
+
+    // ✅ Keep actual role as "owner"
+    req.session.viewMode = 'worker';
+    res.status(200).json({ message: 'Now viewing as worker', viewMode: 'worker' });
 });
 
 app.post('/api/switch-to-owner', (req, res) => {
-  if (req.session.role === 'owner') {
-    req.session.role = 'owner';
-    return res.status(200).json({ message: 'Switched to owner' });
-  }
-  return res.status(403).json({ message: 'Only owner can switch to owner' });
+    if (req.session.role !== 'owner') {
+        return res.status(403).json({ message: 'Only owner can switch to owner view' });
+    }
+
+    // ✅ Keep actual role as "owner"
+    req.session.viewMode = 'owner';
+    res.status(200).json({ message: 'Now viewing as owner', viewMode: 'owner' });
 });
+
+
 // ─── User Management (Admin Panel) ───
 // ─── Admin: Create, Delete, Update Users ───
 app.get('/api/users', requireLogin, isOwner, async (_req, res) => {
@@ -154,13 +162,23 @@ function requireLogin(req, res, next) {
   return res.status(401).json({ message: 'Not logged in' });
 }
 function isOwner(req, res, next) {
-  if (req.session && req.session.role === 'owner') return next();
-  return res.status(403).json({ message: 'Owner access only' });
+    if (req.session && req.session.role === 'owner' && req.session.viewMode !== 'worker') {
+        return next();
+    }
+    return res.status(403).json({ message: 'Owner access only' });
 }
 function isWorker(req, res, next) {
-  if (req.session && req.session.role === 'worker') return next();
-  return res.status(403).json({ message: 'Worker access only' });
+    // Allow both real workers and owners viewing as workers
+    if (
+        req.session &&
+        (req.session.role === 'worker' ||
+            (req.session.role === 'owner' && req.session.viewMode === 'worker'))
+    ) {
+        return next();
+    }
+    return res.status(403).json({ message: 'Worker access only' });
 }
+
 
 // ────── Auth Routes ──────
 app.post('/login', async (req, res) => {
@@ -175,7 +193,8 @@ if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
   req.session.user = user.username;
   req.session.role = user.role;
-  res.status(200).json({ message: 'Login successful', role: user.role });
+  req.session.viewMode = user.role; // ✅ start with same as role
+    res.status(200).json({ message: 'Login successful', role: user.role });
 });
 
 app.post('/logout', (req, res) => {
