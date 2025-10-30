@@ -10,6 +10,7 @@ const path = require('path');
 const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 4000;
+const User = require('./user');
 
 // ────── MongoDB Connection ──────
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protection', {
@@ -31,13 +32,6 @@ const Log = mongoose.model('Log', new mongoose.Schema({
   date: String,
   hours: Number,
   description: String   
-}));
-
-
-const User = mongoose.model('User', new mongoose.Schema({
-  username: String,
-  password: String,
-  role: String // 'owner' or 'worker'
 }));
 
 // ────── Seed Users ──────
