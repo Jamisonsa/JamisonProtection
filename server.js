@@ -8,8 +8,6 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const User = require('./models/User');
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 
