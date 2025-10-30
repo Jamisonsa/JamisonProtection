@@ -1,151 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Panel | Jamison Protection</title>
-  <style>
-    body {
-      background: #121212;
-      color: white;
-      font-family: 'Segoe UI', sans-serif;
-      padding: 30px;
-      max-width: 800px;
-      margin: auto;
-    }
-    input, select {
-      padding: 10px;
-      width: 100%;
-      margin-top: 10px;
-      background: #1f1f1f;
-      color: white;
-      border: none;
-    }
-    button {
-      background: #e63946;
-      border: none;
-      padding: 10px 20px;
-      margin-top: 10px;
-      color: white;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    .user-box {
-      background: #1f1f1f;
-      margin-top: 20px;
-      padding: 10px;
-      border-left: 5px solid #e63946;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Admin Panel | Jamison Protection</title>
+    <style>
+        body {
+            background: #121212;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            padding: 30px;
+            max-width: 900px;
+            margin: auto;
+        }
+        input, select {
+            padding: 10px;
+            width: 100%;
+            margin-top: 10px;
+            background: #1f1f1f;
+            color: white;
+            border: none;
+        }
+        button {
+            background: #e63946;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 10px;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .user-box {
+            background: #1f1f1f;
+            margin-top: 20px;
+            padding: 10px;
+            border-left: 5px solid #e63946;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #1f1f1f;
+        }
+        .logout-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #444;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-  <h1>Admin Panel</h1>
-<h2>View Logs by Date</h2>
-<input type="date" id="filterDate">
-<button onclick="filterLogs()">Search</button>
+<h1>Admin Panel</h1>
+<button class="logout-btn" onclick="logout()">Logout</button>
 
-<table id="logTable" border="1" style="width:100%; margin-top: 10px;">
-  <thead>
-    <tr>
-      <th>User</th>
-      <th>Date</th>
-      <th>Hours</th>
-      <th>Description</th>
-    </tr>
-  </thead>
-  <tbody id="logBody"></tbody>
-</table>
+<section id="adminContent" style="display:none;">
+    <h2>View Logs by Date</h2>
+    <input type="date" id="filterDate">
+    <button onclick="filterLogs()">Search</button>
 
-  <h2>Add New User</h2>
-  <form id="addUserForm">
-    <input type="text" id="newUsername" placeholder="Username" required>
-    <input type="text" id="newPassword" placeholder="Password" required>
-    <select id="newRole">
-      <option value="worker">Worker</option>
-      <option value="owner">Owner</option>
-    </select>
-    <button type="submit">Add User</button>
-  </form>
+    <table id="logTable">
+        <thead>
+        <tr>
+            <th>User</th>
+            <th>Date</th>
+            <th>Hours</th>
+            <th>Description</th>
+        </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+    </table>
 
-  <h2>All Users</h2>
-  <div id="userList"></div>
+    <h2>Add New User</h2>
+    <form id="addUserForm">
+        <input type="text" id="newUsername" placeholder="Username" required>
+        <input type="text" id="newPassword" placeholder="Password" required>
+        <select id="newRole">
+            <option value="worker">Worker</option>
+            <option value="owner">Owner</option>
+        </select>
+        <button type="submit">Add User</button>
+    </form>
 
-  <script>
+    <h2>All Users</h2>
+    <div id="userList"></div>
+</section>
+
+<script>
+    // ────── Session Verification ──────
+    async function verifySession() {
+        try {
+            const res = await fetch('/api/session-debug', { credentials: 'include' });
+            const data = await res.json();
+
+            if (!data.user || data.role !== 'owner') {
+                alert('Owner session required. Please log in again.');
+                location.href = 'login.html';
+                return;
+            }
+
+            console.log('✅ Admin session verified:', data);
+            document.getElementById('adminContent').style.display = 'block';
+            document.body.insertAdjacentHTML('afterbegin', `<p style="text-align:center;">Welcome, ${data.user}</p>`);
+            fetchUsers();
+            loadLogs();
+        } catch (err) {
+            console.error('Session check failed:', err);
+            location.href = 'login.html';
+        }
+    }
+
+    // ────── Fetch & Display Users ──────
     async function fetchUsers() {
-      const res = await fetch('/api/users', { credentials: 'include' });
-      const users = await res.json();
-      const list = document.getElementById('userList');
-      list.innerHTML = '';
+        try {
+            const res = await fetch('/api/users', { credentials: 'include' });
+            if (res.status === 401 || res.status === 403) return location.href = 'login.html';
+            const users = await res.json();
 
-      users.forEach(user => {
-        const div = document.createElement('div');
-        div.className = 'user-box';
-        div.innerHTML = `
-          <strong>${user.username}</strong> (${user.role})<br>
-          <button onclick="deleteUser('${user._id}')">Delete</button>
-          <button onclick="resetPassword('${user._id}')">Reset Password</button>
-        `;
-        list.appendChild(div);
-      });
+            const list = document.getElementById('userList');
+            list.innerHTML = '';
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'user-box';
+                div.innerHTML = `
+            <strong>${user.username}</strong> (${user.role})<br>
+            <button onclick="deleteUser('${user._id}')">Delete</button>
+            <button onclick="resetPassword('${user._id}')">Reset Password</button>
+          `;
+                list.appendChild(div);
+            });
+        } catch (err) {
+            console.error('Failed to load users:', err);
+        }
     }
 
-    async function deleteUser(id) {
-      if (confirm('Are you sure you want to delete this user?')) {
-        await fetch('/api/users/' + id, { method: 'DELETE', credentials: 'include' });
-        fetchUsers();
-      }
-    }
-
-    async function resetPassword(id) {
-      const newPass = prompt('Enter new password:');
-      if (newPass) {
-        await fetch('/api/users/' + id, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ password: newPass })
-        });
-        alert('Password reset.');
-      }
-    }
-
+    // ────── Add New User ──────
     document.getElementById('addUserForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      const username = document.getElementById('newUsername').value;
-      const password = document.getElementById('newPassword').value;
-      const role = document.getElementById('newRole').value;
+        e.preventDefault();
+        const username = newUsername.value.trim();
+        const password = newPassword.value.trim();
+        const role = newRole.value;
 
-      await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password, role })
-      });
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, password, role })
+        });
 
-      e.target.reset();
-      fetchUsers();
+        const data = await res.json();
+        alert(data.message);
+        e.target.reset();
+        fetchUsers();
     });
 
-    fetchUsers();
+    // ────── Delete User ──────
+    async function deleteUser(id) {
+        if (!confirm('Are you sure you want to delete this user?')) return;
+        await fetch(`/api/users/${id}`, { method: 'DELETE', credentials: 'include' });
+        fetchUsers();
+    }
+
+    // ────── Reset Password ──────
+    async function resetPassword(id) {
+        const newPass = prompt('Enter new password:');
+        if (!newPass) return;
+        await fetch(`/api/users/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ password: newPass })
+        });
+        alert('Password reset successfully.');
+    }
+
+    // ────── Logs ──────
+    async function loadLogs() {
+        try {
+            const res = await fetch('/api/view-logs', { credentials: 'include' });
+            if (!res.ok) throw new Error('Unable to load logs');
+            const logs = await res.json();
+            renderLogs(logs);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to load logs.');
+        }
+    }
+
     async function filterLogs() {
-  const date = document.getElementById('filterDate').value;
-  const res = await fetch('/api/logs-by-date?date=' + date, { credentials: 'include' });
-  const logs = await res.json();
+        const date = filterDate.value;
+        if (!date) return loadLogs();
+        const res = await fetch(`/api/logs-by-date?date=${date}`, { credentials: 'include' });
+        const logs = await res.json();
+        renderLogs(logs);
+    }
 
-  const tbody = document.getElementById('logBody');
-  tbody.innerHTML = '';
-  logs.forEach(log => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${log.username}</td>
-      <td>${log.date}</td>
-      <td>${log.hours}</td>
-      <td>${log.description || ''}</td>
-    `;
-    tbody.appendChild(row);
-  });
-}
+    function renderLogs(logs) {
+        const tbody = document.getElementById('logBody');
+        tbody.innerHTML = logs.length
+            ? logs.map(l => `
+            <tr>
+              <td>${l.username}</td>
+              <td>${l.date}</td>
+              <td>${l.hours}</td>
+              <td>${l.description || ''}</td>
+            </tr>`).join('')
+            : '<tr><td colspan="4">No logs found.</td></tr>';
+    }
 
-  </script>
-  
+    // ────── Logout ──────
+    async function logout() {
+        await fetch('/logout', { method: 'POST', credentials: 'include' });
+        location.href = 'login.html';
+    }
+
+    verifySession();
+</script>
 </body>
 </html>
