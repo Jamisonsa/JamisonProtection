@@ -77,6 +77,13 @@ app.use(session({
     httpOnly: true
   }
 }));
+app.use((req, res, next) => {
+    res.setHeader(
+        "Content-Security-Policy",
+        "default-src 'self' data: https:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https:;"
+    );
+    next();
+});
 
 
 
