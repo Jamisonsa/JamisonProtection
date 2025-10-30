@@ -187,25 +187,14 @@
     }
 
     function switchToWorker() {
-      fetch('/api/switch-to-worker', {
-        method: 'POST',
-        credentials: 'include'
-      })
-        .then(async res => {
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(text.includes('<!DOCTYPE') ? 'Invalid session or route' : text);
-          }
-          return res.json();
+        fetch('/api/switch-to-worker', {
+            method: 'POST',
+            credentials: 'include'
         })
-        .then(() => {
-          window.location.href = 'worker-dashboard.html';
-        })
-        .catch(err => {
-          alert('Switch failed: ' + err.message);
-          console.error(err);
-        });
+            .then(res => res.ok ? (location.href = 'worker-dashboard.html') : alert('Only owner can switch.'))
+            .catch(err => alert('Switch failed: ' + err.message));
     }
+
 
     function goToAdmin() {
       fetch('/api/verify-owner', {

@@ -141,11 +141,12 @@
     function switchToOwner() {
         fetch('/api/switch-to-owner', {
             method: 'POST',
-            credentials: 'include',
+            credentials: 'include'
         })
-            .then(res => res.ok ? (location.href = 'owner-panel.html') : alert('Only the owner can switch back.'))
+            .then(res => res.ok ? (location.href = 'owner-panel.html') : alert('Only owner can switch back.'))
             .catch(err => alert('Switch failed: ' + err.message));
     }
+
 
     document.getElementById('logForm').addEventListener('submit', async e => {
         e.preventDefault();
