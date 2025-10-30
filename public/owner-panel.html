@@ -112,6 +112,41 @@
         container.appendChild(div);
       });
     }
+        async function loadDroppedShifts() {
+        const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
+        const all = await res.json();
+        const dropped = all.filter(s => s.status === 'dropped' && !s.claimedBy);
+        const container = document.getElementById('droppedShiftList');
+
+        if (dropped.length === 0) {
+        container.innerHTML = '<p>No dropped shifts at the moment.</p>';
+        return;
+    }
+
+        container.innerHTML = dropped.map(s => `
+    <div class="shift" style="border:2px solid red; margin-bottom:10px; padding:10px;">
+      <strong>${s.date} at ${s.time}</strong><br>
+      Location: ${s.location}<br>
+      Dropped by: ${s.droppedBy || 'Unknown'}<br>
+      <button onclick="repostShift('${s._id}')">Repost as Available</button>
+    </div>
+  `).join('');
+    }
+
+        async function repostShift(id) {
+        await fetch('/api/repost-shift', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ shiftId: id })
+        });
+        alert('Shift reposted as available.');
+        loadDroppedShifts();
+    }
+
+        // Load dropped shifts when panel loads
+        loadDroppedShifts();
+
 
     function loadLogs() {
       const selectedDate = document.getElementById('filterDate')?.value;

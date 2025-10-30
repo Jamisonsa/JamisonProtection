@@ -1,6 +1,51 @@
 // server.js
 process.env.NODE_ENV = 'production';
 require('dotenv').config();
+// ───── Twilio ─────
+let twilioClient = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
+
+const E164 = /^\+?[1-9]\d{1,14}$/;
+async function notifyUsersOfNewShift(shift) {
+    try {
+        if (!twilioClient) return; // no-op if Twilio not configured
+
+        // Get all owners + workers who opted in and have a valid phone
+        const recipients = await User.find({
+            role: { $in: ['owner', 'worker'] },
+            notifySms: true,
+            phone: { $ne: null }
+        }, { phone: 1, username: 1 });
+
+        if (!recipients.length) return;
+
+        const body =
+            `New shift posted:\n` +
+            `📅 ${shift.date} at ${shift.time}\n` +
+            `📍 ${shift.location}\n` +
+            (shift.notes ? `📝 ${shift.notes}\n` : '') +
+            `— Jamison Protection`;
+
+        const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
+            ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID }
+            : { from: process.env.TWILIO_FROM };
+
+        const sends = recipients
+            .filter(u => E164.test(u.phone))
+            .map(u => twilioClient.messages.create({
+                ...fromConfig,
+                to: u.phone,
+                body
+            }));
+
+        await Promise.allSettled(sends);
+    } catch (err) {
+        console.error('SMS notify error:', err?.message || err);
+    }
+}
+
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -19,13 +64,20 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protectio
 }).then(() => console.log('MongoDB connected'));
 
 // ────── Schemas ──────
+// ────── Schemas ──────
 const Shift = mongoose.model('Shift', new mongoose.Schema({
-  date: String,
-  time: String,
-  location: String,
-  notes: String,
-  claimedBy: String
+    date: String,          // e.g. "2025-11-03"
+    time: String,          // e.g. "09:00"
+    location: String,
+    notes: String,
+    claimedBy: String,     // username who currently holds it, or null
+    status: { type: String, enum: ['available','claimed','dropped'], default: 'available' },
+    droppedBy: String,     // username who dropped it (last)
+    dropTime: Date,        // when it was dropped
+    alertSent: { type: Boolean, default: false } // to prevent repeat 24h texts
 }));
+
+
 
 const Log = mongoose.model('Log', new mongoose.Schema({
   username: String,
@@ -204,11 +256,21 @@ app.post('/logout', (req, res) => {
 
 // ────── Shift Routes ──────
 app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
-  const { date, time, starttime, endtime, location, notes } = req.body;
-  const shift = new Shift({ date, time, location, notes });
-  await shift.save();
-  res.json({ message: 'Shift posted' });
+    const { date, time, location, notes } = req.body;
+    const shift = new Shift({
+        date, time, location, notes,
+        status: 'available',
+        claimedBy: null,
+        droppedBy: null,
+        dropTime: null,
+        alertSent: false
+    });
+    await shift.save();
+
+    notifyUsersOfNewShift(shift).catch(() => {});
+    res.json({ message: 'Shift posted' });
 });
+
 
 app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
   const shifts = await Shift.find({ claimedBy: null });
@@ -219,15 +281,54 @@ app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
   const shifts = await Shift.find();
   res.json(shifts);
 });
-
 app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
-  const { shiftId } = req.body;
-  const shift = await Shift.findById(shiftId);
-  if (!shift || shift.claimedBy) return res.status(400).json({ message: 'Already claimed' });
+    const { shiftId } = req.body;
+    const shift = await Shift.findById(shiftId);
+    if (!shift) return res.status(404).json({ message: 'Shift not found' });
+    if (shift.claimedBy) return res.status(400).json({ message: 'Shift already claimed' });
 
-  shift.claimedBy = req.session.user;
-  await shift.save();
-  res.json({ message: 'Claimed' });
+    shift.claimedBy = req.session.user;
+    shift.status = 'claimed';
+    shift.droppedBy = null;
+    shift.dropTime = null;
+    shift.alertSent = false; // reset any previous alert state
+    await shift.save();
+
+    res.json({ message: 'Shift claimed successfully' });
+});
+
+
+// ────── Drop Shift ──────
+app.post('/api/drop', requireLogin, isWorker, async (req, res) => {
+    const { shiftId } = req.body;
+    const shift = await Shift.findById(shiftId);
+    if (!shift) return res.status(404).json({ message: 'Shift not found' });
+    if (shift.claimedBy !== req.session.user)
+        return res.status(403).json({ message: 'You can only drop your own shifts' });
+
+    shift.status = 'dropped';
+    shift.droppedBy = req.session.user;
+    shift.claimedBy = null;
+    shift.dropTime = new Date();
+    // keep alertSent as-is; 24h checker will set it when it fires
+    await shift.save();
+
+    res.json({ message: 'Shift dropped successfully' });
+});
+
+app.post('/api/repost-shift', requireLogin, isOwner, async (req, res) => {
+    const { shiftId } = req.body;
+    const shift = await Shift.findById(shiftId);
+    if (!shift) return res.status(404).json({ message: 'Shift not found' });
+
+    shift.status = 'available';
+    shift.claimedBy = null;
+    shift.droppedBy = null;
+    shift.dropTime = null;
+    shift.alertSent = false;
+    await shift.save();
+
+    res.json({ message: 'Shift reposted as available' });
 });
 
 // ────── Log Hours ──────
@@ -270,7 +371,86 @@ app.get('/api/debug-session', (req, res) => {
     fullSession: req.session
   });
 });
+// Available (or dropped but unclaimed) shifts for workers to claim
+app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
+    const shifts = await Shift.find({
+        claimedBy: null,
+        status: { $in: ['available', 'dropped'] }
+    }).sort({ date: 1, time: 1 });
+    res.json(shifts);
+});
 
+// Current user's claimed shifts (to show Drop buttons)
+app.get('/api/my-shifts', requireLogin, isWorker, async (req, res) => {
+    const shifts = await Shift.find({
+        claimedBy: req.session.user,
+        status: 'claimed'
+    }).sort({ date: 1, time: 1 });
+    res.json(shifts);
+});
+
+// ────── Shift Drop Monitor ──────
+function toDateTime(dateStr, timeStr) {
+    // dateStr "2025-11-03", timeStr "09:00" -> Date in local server time
+    return new Date(`${dateStr}T${timeStr}:00`);
+}
+
+async function checkDroppedShifts() {
+    try {
+        const now = new Date();
+
+        // all dropped & unclaimed shifts that haven't been alerted yet
+        const dropped = await Shift.find({
+            status: 'dropped',
+            claimedBy: null,
+            alertSent: false
+        });
+
+        for (const shift of dropped) {
+            const startAt = toDateTime(shift.date, shift.time);
+            const hoursUntil = (startAt - now) / 36e5;
+
+            // alert when within 24 hours but still in the future
+            if (hoursUntil <= 24 && hoursUntil > 0) {
+                console.log(`🚨 24h alert for shift ${shift._id} at ${shift.location} (${shift.date} ${shift.time})`);
+
+                if (twilioClient) {
+                    const owners = await User.find({
+                        role: { $in: ['owner', 'admin'] },
+                        notifySms: true,
+                        phone: { $ne: null }
+                    }, { phone: 1, username: 1 });
+
+                    const body =
+                        `⚠️ Urgent Shift: ${shift.location}\n` +
+                        `${shift.date} ${shift.time}\n` +
+                        `Dropped by ${shift.droppedBy}. Needs coverage within 24h.`;
+
+                    const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
+                        ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID }
+                        : { from: process.env.TWILIO_FROM };
+
+                    await Promise.allSettled(
+                        owners.map(o => twilioClient.messages.create({ ...fromConfig, to: o.phone, body }))
+                    );
+                }
+
+                // prevent repeated alerts
+                shift.alertSent = true;
+                await shift.save();
+            }
+        }
+    } catch (err) {
+        console.error('Error checking dropped shifts:', err?.message || err);
+    }
+}
+
+// run every 30 minutes
+setInterval(checkDroppedShifts, 30 * 60 * 1000);
+
+
+// Run every 30 minutes
+setInterval(checkDroppedShifts, 30 * 60 * 1000);
 
 // ────── Start Server ──────
 app.listen(PORT, () => {

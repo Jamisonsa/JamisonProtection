@@ -70,6 +70,9 @@
     <h2>Available Shifts</h2>
     <div id="shiftList"></div>
 
+    <h2>My Shifts</h2>
+    <div id="myShiftList"></div>
+
     <h2>Log Hours</h2>
     <form id="logForm">
         <input type="date" id="logDate" required>
@@ -80,45 +83,41 @@
 </main>
 
 <script>
-    async function verifySession(retries = 3) {
-        try {
-            const res = await fetch('/api/session-debug', { credentials: 'include' });
-            const data = await res.json();
-
-            if (data.user) {
-                console.log('✅ Session OK:', data);
-                document.body.insertAdjacentHTML('afterbegin', `<p style="text-align:center;">Welcome, ${data.user}</p>`);
-                loadShifts();
-                return;
-            }
-
-            if (retries > 0) {
-                console.log('⏳ Session not ready, retrying...');
-                setTimeout(() => verifySession(retries - 1), 500);
-            } else {
-                console.warn('⚠️ No valid session, redirecting.');
-                location.href = 'login.html';
-            }
-        } catch (err) {
-            console.error('Session check failed:', err);
-            location.href = 'login.html';
-        }
-    }
-
     async function loadShifts() {
         const res = await fetch('/api/shifts', { credentials: 'include' });
         if (res.status === 401) return (location.href = 'login.html');
         const shifts = await res.json();
         const container = document.getElementById('shiftList');
+
         container.innerHTML = shifts.length
             ? shifts.map(s => `
-          <div class="shift">
-            <strong>${s.date} at ${s.time}</strong><br>
-            Location: ${s.location}<br>
-            Notes: ${s.notes || 'None'}<br>
-            <button onclick="claimShift('${s._id}')">Claim Shift</button>
-          </div>`).join('')
-            : '<p>No available shifts.</p>';
+      <div class="shift">
+        <strong>${s.date} at ${s.time}</strong><br>
+        Location: ${s.location}<br>
+        Notes: ${s.notes || 'None'}<br>
+        Status: ${s.status}<br>
+        <button onclick="claimShift('${s._id}')">Claim</button>
+      </div>
+    `).join('')
+            : '<p>No available shifts at this time.</p>';
+    }
+
+    async function loadMyShifts() {
+        const res = await fetch('/api/my-shifts', { credentials: 'include' });
+        if (res.status === 401) return (location.href = 'login.html');
+        const shifts = await res.json();
+        const container = document.getElementById('myShiftList');
+
+        container.innerHTML = shifts.length
+            ? shifts.map(s => `
+      <div class="shift">
+        <strong>${s.date} at ${s.time}</strong><br>
+        Location: ${s.location}<br>
+        Notes: ${s.notes || 'None'}<br>
+        <button onclick="dropShift('${s._id}')">Drop Shift</button>
+      </div>
+    `).join('')
+            : '<p>You have no claimed shifts.</p>';
     }
 
     async function claimShift(id) {
@@ -130,43 +129,36 @@
         });
         const data = await res.json();
         alert(data.message);
-        loadShifts();
+        await loadShifts();
+        await loadMyShifts();
     }
 
-    async function logout() {
-        await fetch('/logout', { method: 'POST', credentials: 'include' });
-        location.href = 'login.html';
-    }
-
-    function switchToOwner() {
-        fetch('/api/switch-to-owner', {
-            method: 'POST',
-            credentials: 'include'
-        })
-            .then(res => res.ok ? (location.href = 'owner-panel.html') : alert('Only owner can switch back.'))
-            .catch(err => alert('Switch failed: ' + err.message));
-    }
-
-
-    document.getElementById('logForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const date = logDate.value;
-        const hours = logHours.value;
-        const description = logDescription.value;
-
-        const res = await fetch('/api/log-hours', {
+    async function dropShift(shiftId) {
+        const res = await fetch('/api/drop', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ date, hours, description })
+            body: JSON.stringify({ shiftId })
         });
-
         const data = await res.json();
         alert(data.message);
-        e.target.reset();
-    });
+        await loadShifts();
+        await loadMyShifts();
+    }
 
-    verifySession();
+    // Check session and initialize
+    fetch('/api/session-debug', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.user) {
+                location.href = 'login.html';
+                return;
+            }
+            document.getElementById('welcomeMsg').textContent = `Welcome, ${data.user}`;
+            loadShifts();
+            loadMyShifts();
+        });
 </script>
+
 </body>
 </html>
