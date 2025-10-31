@@ -64,16 +64,17 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protectio
 }).then(() => console.log('MongoDB connected'));
 
 // ────── Schemas ──────
-// ────── Schemas ──────
 const Shift = mongoose.model('Shift', new mongoose.Schema({
-    date: String,          // e.g. "2025-11-03"
-    time: String,          // e.g. "09:00"
+    date: String,
+    startTime: String,
+    expectedEnd: String,
     location: String,
+    position: String,
     notes: String,
-    claimedBy: String,     // username who currently holds it, or null
     status: { type: String, enum: ['available','claimed','dropped'], default: 'available' },
-    droppedBy: String,     // username who dropped it (last)
-    dropTime: Date,        // when it was dropped
+    claimedBy: String,
+    droppedBy: String,
+    dropTime: String,
     alertSent: { type: Boolean, default: false } // to prevent repeat 24h texts
 }));
 
@@ -292,9 +293,15 @@ app.post('/logout', (req, res) => {
 
 // ────── Shift Routes ──────
 app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
-    const { date, time, location, notes } = req.body;
+    const { date, startTime, expectedEnd, location, position, notes } = req.body;
+
     const shift = new Shift({
-        date, time, location, notes,
+        date,
+        startTime,
+        expectedEnd,
+        location,
+        position,
+        notes,
         status: 'available',
         claimedBy: null,
         droppedBy: null,
@@ -308,8 +315,15 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     notifyUsersOfNewShift(shift).catch(() => {});
     res.json({ message: 'Shift posted' });
 });
-
-
+const Log = mongoose.model('Log', new mongoose.Schema({
+    user: String,
+    date: String,
+    startTime: String,
+    endTime: String,
+    location: String,
+    position: String,
+    hours: Number
+}));
 
 app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
   const shifts = await Shift.find();
@@ -414,6 +428,29 @@ app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
     console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
 
     res.json(shifts);
+});
+app.post('/api/log-hours', requireLogin, async (req, res) => {
+    try {
+        const { date, startTime, endTime, location, position, hours } = req.body;
+        const user = req.session.user;
+
+        const newLog = new Log({
+            user,
+            date,
+            startTime,
+            endTime,
+            location,
+            position,
+            hours
+        });
+
+        await newLog.save();
+        console.log(`🕒 Hours logged by ${user}: ${hours} hrs on ${date} (${position})`);
+        res.json({ message: 'Hours logged successfully' });
+    } catch (err) {
+        console.error('Error logging hours:', err);
+        res.status(500).json({ message: 'Failed to log hours' });
+    }
 });
 
 // Current user's claimed shifts (to show Drop buttons)

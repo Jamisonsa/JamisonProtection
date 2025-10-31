@@ -74,13 +74,31 @@
     <h2>My Shifts</h2>
     <div id="myShiftList"></div>
 
-    <h2>Log Hours</h2>
-    <form id="logForm">
-        <input type="date" id="logDate" required>
-        <input type="number" id="logHours" placeholder="Hours Worked" min="0.5" step="0.5" required>
-        <input type="text" id="logDescription" placeholder="Description of Event" required>
-        <button type="submit">Submit Hours</button>
+    <h2>Log Your Hours</h2>
+    <form id="logHoursForm" onsubmit="submitHours(event)">
+        <label>Date:</label>
+        <input type="date" id="logDate" required><br><br>
+
+        <label>Start Time:</label>
+        <input type="time" id="logStart" required><br><br>
+
+        <label>End Time:</label>
+        <input type="time" id="logEnd" required><br><br>
+
+        <label>Location:</label>
+        <select id="logLocation" required>
+            <option value="John Carroll School">John Carroll School</option>
+        </select><br><br>
+
+        <label>Work Position:</label>
+        <input type="text" id="logPosition" placeholder="e.g. Door Monitor" required><br><br>
+
+        <label>Hours Worked:</label>
+        <input type="number" id="logHours" placeholder="e.g. 5.5" step="0.1" required><br><br>
+
+        <button type="submit" class="submit-btn">Submit Log</button>
     </form>
+
 </main>
 
 <script>
@@ -121,6 +139,29 @@
             `).join('')
         : '<p>You have no claimed shifts.</p>';
     }
+        async function submitHours(event) {
+            event.preventDefault();
+
+            const log = {
+                date: document.getElementById('logDate').value,
+                startTime: document.getElementById('logStart').value,
+                endTime: document.getElementById('logEnd').value,
+                location: document.getElementById('logLocation').value,
+                position: document.getElementById('logPosition').value,
+                hours: document.getElementById('logHours').value
+            };
+
+            const res = await fetch('/api/log-hours', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(log)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            document.getElementById('logHoursForm').reset();
+        }
 
         async function claimShift(id) {
         const res = await fetch('/api/claim', {
