@@ -89,6 +89,16 @@ const Log = mongoose.model('Log', new mongoose.Schema({
     position: String,
     hours: Number
 }));
+// ─── Security Log Model ───
+const SecurityLog = mongoose.model('SecurityLog', new mongoose.Schema({
+    date: String,
+    time: String,
+    location: String,
+    description: String,
+    initials: String,
+    submittedBy: String,
+    createdAt: { type: Date, default: Date.now }
+}));
 
 
 // ────── Seed Users ──────
@@ -294,6 +304,60 @@ app.post('/logout', (req, res) => {
   req.session.destroy();
   res.json({ message: 'Logged out' });
 });
+// ─── Submit new security log ───
+app.post('/api/security-logs', requireLogin, async (req, res) => {
+    try {
+        const { date, time, location, description, initials } = req.body;
+        const submittedBy = req.session.user;
+
+        const newLog = new SecurityLog({
+            date,
+            time,
+            location,
+            description,
+            initials,
+            submittedBy
+        });
+
+        await newLog.save();
+        console.log(`🛡️ Security log added by ${submittedBy}: ${description}`);
+        res.json({ message: 'Security log submitted successfully' });
+    } catch (err) {
+        console.error('Error submitting security log:', err);
+        res.status(500).json({ message: 'Failed to submit security log' });
+    }
+});
+
+// ─── Get security logs with filtering + CSV export ───
+app.get('/api/security-logs', requireLogin, async (req, res) => {
+    try {
+        const { date, initials, format } = req.query;
+        const filter = {};
+
+        if (date) filter.date = date;
+        if (initials) filter.initials = { $regex: new RegExp(initials, 'i') };
+
+        const logs = await SecurityLog.find(filter).sort({ date: -1, time: -1 });
+
+        // ✅ CSV Export Mode
+        if (format === 'csv') {
+            const { Parser } = require('json2csv');
+            const fields = ['date', 'time', 'location', 'description', 'initials', 'submittedBy'];
+            const parser = new Parser({ fields });
+            const csv = parser.parse(logs);
+
+            res.header('Content-Type', 'text/csv');
+            res.attachment('security_logs.csv');
+            return res.send(csv);
+        }
+
+        res.json(logs);
+    } catch (err) {
+        console.error('Error fetching security logs:', err);
+        res.status(500).json({ message: 'Failed to load security logs' });
+    }
+});
+
 
 // ────── Shift Routes ──────
 app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {

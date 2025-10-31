@@ -148,6 +148,22 @@
         font-size: 15px;
         color: #f2f2f2;
     }
+    #securityLogFilter input, #securityLogFilter button {
+        margin: 5px;
+        padding: 8px;
+        border-radius: 5px;
+        border: none;
+    }
+    #securityLogFilter button {
+        background: #e63946;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        transition: 0.2s;
+    }
+    #securityLogFilter button:hover {
+        background: #c5303d;
+    }
 
 
   </style>
@@ -197,6 +213,24 @@
       </div>
 
       <div id="shiftList"></div>
+      <hr>
+      <h2>Security Log Viewer</h2>
+
+      <div id="securityLogFilter" style="margin-bottom: 15px;">
+          <label>Date:</label>
+          <input type="date" id="filterDateLog">
+
+          <label>Worker Initials:</label>
+          <input type="text" id="filterInitialsLog" placeholder="e.g. FJ">
+
+          <button onclick="filterSecurityLogs()">Apply Filter</button>
+          <button onclick="clearSecurityFilters()">Clear</button>
+          <button onclick="exportSecurityLogs()">⬇ Export CSV</button>
+      </div>
+
+      <div id="securityLogContainer">
+          <p>Loading logs...</p>
+      </div>
 
   </main>
 
@@ -445,6 +479,60 @@
               }
           }
       }
+      async function loadSecurityLogs(date = '', initials = '') {
+          try {
+              let url = '/api/security-logs';
+              const params = [];
+              if (date) params.push(`date=${encodeURIComponent(date)}`);
+              if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
+              if (params.length) url += '?' + params.join('&');
+
+              const res = await fetch(url, { credentials: 'include' });
+              const logs = await res.json();
+
+              const container = document.getElementById('securityLogContainer');
+              if (!logs.length) {
+                  container.innerHTML = '<p>No logs found.</p>';
+                  return;
+              }
+
+              container.innerHTML = logs.map(log => `
+      <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
+        <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
+        ${log.description}<br>
+        <small>Initials: ${log.initials} | Submitted by: ${log.submittedBy}</small>
+      </div>
+    `).join('');
+          } catch (err) {
+              console.error('Error loading logs:', err);
+          }
+      }
+
+      function filterSecurityLogs() {
+          const date = document.getElementById('filterDateLog').value;
+          const initials = document.getElementById('filterInitialsLog').value;
+          loadSecurityLogs(date, initials);
+      }
+
+      function clearSecurityFilters() {
+          document.getElementById('filterDateLog').value = '';
+          document.getElementById('filterInitialsLog').value = '';
+          loadSecurityLogs();
+      }
+
+      function exportSecurityLogs() {
+          const date = document.getElementById('filterDateLog').value;
+          const initials = document.getElementById('filterInitialsLog').value;
+
+          let url = '/api/security-logs?format=csv';
+          if (date) url += `&date=${encodeURIComponent(date)}`;
+          if (initials) url += `&initials=${encodeURIComponent(initials)}`;
+
+          window.open(url, '_blank');
+      }
+
+      // Load all logs when owner panel opens
+      document.addEventListener('DOMContentLoaded', loadSecurityLogs);
 
     function goToAdmin() {
       fetch('/api/verify-owner', {
