@@ -316,20 +316,28 @@ function isWorker(req, res, next) {
 
 
 // ────── Auth Routes ──────
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
-if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
 
-const isMatch = await user.comparePassword(password);
-if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
 
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid password' });
+        }
 
-  req.session.user = user.username;
-  req.session.role = user.role;
-  req.session.viewMode = user.role; // ✅ start with same as role
-    res.status(200).json({ message: 'Login successful', role: user.role });
+        req.session.user = { username: user.username, role: user.role };
+        console.log(`✅ ${user.username} logged in as ${user.role}`);
+
+        res.json({ message: 'Login successful', role: user.role });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ message: 'Server error during login' });
+    }
 });
 
 app.post('/logout', (req, res) => {
