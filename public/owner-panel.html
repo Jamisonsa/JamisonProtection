@@ -162,14 +162,30 @@
   </header>
 
   <main>
-    <h2>Post New Shift</h2>
-    <form id="postShiftForm">
-      <input type="date" id="date" required>
-      <input type="time" id="time" required>
-      <input type="text" id="location" placeholder="Location" required>
-      <textarea id="notes" placeholder="Notes (optional)"></textarea>
-      <button type="submit">Post Shift</button>
-    </form>
+      <h2>Create New Shift</h2>
+      <form id="shiftForm" onsubmit="postShift(event)">
+          <label>Date:</label>
+          <input type="date" id="shiftDate" required><br><br>
+
+          <label>Start Time:</label>
+          <input type="time" id="shiftStart" required><br><br>
+
+          <label>Expected End Time:</label>
+          <input type="text" id="shiftEnd" placeholder="e.g. 5:00 PM or Until Dismissed" required><br><br>
+
+          <label>Location:</label>
+          <select id="shiftLocation" required>
+              <option value="John Carroll School">John Carroll School</option>
+          </select><br><br>
+
+          <label>Work Position:</label>
+          <input type="text" id="shiftPosition" placeholder="e.g. Front Gate Security" required><br><br>
+
+          <label>Notes:</label>
+          <textarea id="shiftNotes" placeholder="Additional notes..."></textarea><br><br>
+
+          <button type="submit" class="submit-btn">Post Shift</button>
+      </form>
 
       <h2>All Shifts</h2>
 
@@ -343,27 +359,32 @@
         });
     }
 
-    document.getElementById('postShiftForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const date = document.getElementById('date').value;
-      const time = document.getElementById('time').value;
-      const location = document.getElementById('location').value;
-      const notes = document.getElementById('notes').value;
+      async function postShift(event) {
+          event.preventDefault();
 
-      const res = await fetch('/api/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ date, time, location, notes })
-      });
+          const shift = {
+              date: document.getElementById('shiftDate').value,
+              startTime: document.getElementById('shiftStart').value,
+              expectedEnd: document.getElementById('shiftEnd').value,
+              location: document.getElementById('shiftLocation').value,
+              position: document.getElementById('shiftPosition').value,
+              notes: document.getElementById('shiftNotes').value
+          };
 
-      const data = await res.json();
-      alert(data.message);
-      loadShifts();
-      e.target.reset();
-    });
+          const res = await fetch('/api/shifts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(shift)
+          });
 
-    function logout() {
+          const data = await res.json();
+          alert(data.message);
+          document.getElementById('shiftForm').reset();
+          loadShifts();
+      }
+
+      function logout() {
       fetch('/logout', {
         method: 'POST',
         credentials: 'include'
