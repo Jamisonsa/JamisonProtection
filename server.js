@@ -456,6 +456,64 @@ app.get('/api/logs-by-date', requireLogin, isOwner, async (req, res) => {
   const logs = await Log.find({ date });
   res.json(logs);
 });
+// ─── Payroll Summary ───
+// ─── Detailed Payroll Summary ───
+app.get('/api/payroll', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        if (!startDate || !endDate) {
+            return res.status(400).json({ message: 'Start and end dates required' });
+        }
+
+        // Get all logged hours in the range
+        const logs = await Log.find({
+            date: { $gte: startDate, $lte: endDate }
+        }).sort({ user: 1, date: 1 });
+
+        if (!logs.length) return res.json([]);
+
+        // Get all users and build a rate map
+        const users = await User.find();
+        const rateMap = {};
+        users.forEach(u => { rateMap[u.username] = u.hourlyRate || 20; });
+
+        // Group logs by user
+        const grouped = {};
+        logs.forEach(log => {
+            const user = log.user || 'Unknown';
+            if (!grouped[user]) grouped[user] = [];
+            grouped[user].push(log);
+        });
+
+        // Build detailed payroll data
+        const results = Object.keys(grouped).map(user => {
+            const rate = rateMap[user] || 20;
+            const totalHours = grouped[user].reduce((sum, l) => sum + (parseFloat(l.hours) || 0), 0);
+            const totalPay = totalHours * rate;
+
+            return {
+                user,
+                rate,
+                totalHours: totalHours.toFixed(2),
+                totalPay: totalPay.toFixed(2),
+                entries: grouped[user].map(l => ({
+                    date: l.date,
+                    start: l.startTime,
+                    end: l.endTime,
+                    location: l.location,
+                    position: l.position,
+                    hours: l.hours,
+                    pay: (l.hours * rate).toFixed(2)
+                }))
+            };
+        });
+
+        res.json(results);
+    } catch (err) {
+        console.error('Error building payroll report:', err);
+        res.status(500).json({ message: 'Payroll generation failed' });
+    }
+});
 
 
 // ────── Admin Panel ──────
