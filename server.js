@@ -56,6 +56,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 4000;
 const User = require('./user');
+const bcrypt = require('bcrypt');
 
 // ────── MongoDB Connection ──────
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protection', {
