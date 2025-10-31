@@ -57,6 +57,56 @@
             padding: 15px;
             border-left: 5px solid #e63946;
         }
+        #securityLogForm {
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        #securityLogForm input,
+        #securityLogForm select,
+        #securityLogForm textarea {
+            width: 100%;
+            margin: 4px 0;
+            padding: 8px;
+            border-radius: 4px;
+            border: none;
+            outline: none;
+        }
+
+        #securityLogForm button {
+            background: #e63946;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #securityLogForm button:hover {
+            background: #c5303d;
+        }
+        #securityLogFilter input, #securityLogFilter button {
+            margin: 5px;
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        #securityLogFilter button {
+            background: #e63946;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        #securityLogFilter button:hover {
+            background: #c5303d;
+        }
+
     </style>
 </head>
 <body>
@@ -73,31 +123,48 @@
 
     <h2>My Shifts</h2>
     <div id="myShiftList"></div>
-
-    <h2>Log Your Hours</h2>
-    <form id="logHoursForm" onsubmit="submitHours(event)">
+    <h2>Daily Security Log</h2>
+    <form id="securityLogForm" onsubmit="submitSecurityLog(event)">
         <label>Date:</label>
         <input type="date" id="logDate" required><br><br>
 
-        <label>Start Time:</label>
-        <input type="time" id="logStart" required><br><br>
-
-        <label>End Time:</label>
-        <input type="time" id="logEnd" required><br><br>
+        <label>Time:</label>
+        <input type="time" id="logTime" required><br><br>
 
         <label>Location:</label>
         <select id="logLocation" required>
             <option value="John Carroll School">John Carroll School</option>
         </select><br><br>
 
-        <label>Work Position:</label>
-        <input type="text" id="logPosition" placeholder="e.g. Front Desk" required><br><br>
+        <label>Description:</label><br>
+        <textarea id="logDescription" placeholder="Describe the event or observation..." required></textarea><br><br>
 
-        <label>Hours Worked:</label>
-        <input type="number" id="logHours" placeholder="e.g. 5.5" step="0.1" required><br><br>
+        <label>Worker Initials:</label>
+        <input type="text" id="logInitials" maxlength="3" placeholder="e.g. FJ" required><br><br>
 
         <button type="submit" class="submit-btn">Submit Log</button>
     </form>
+
+    <hr>
+
+    <h3>All Security Logs</h3>
+
+    <div id="securityLogFilter" style="margin-bottom: 15px;">
+        <label>Date:</label>
+        <input type="date" id="filterDate">
+
+        <label>Worker Initials:</label>
+        <input type="text" id="filterInitials" placeholder="e.g. FJ">
+
+        <button onclick="filterSecurityLogs()">Apply Filter</button>
+        <button onclick="clearSecurityFilters()">Clear</button>
+        <button onclick="exportSecurityLogs()">⬇ Export CSV</button>
+    </div>
+
+    <div id="securityLogsContainer">
+        <p>Loading logs...</p>
+    </div>
+
 
 </main>
 
@@ -161,6 +228,84 @@
             const data = await res.json();
             alert(data.message);
             document.getElementById('logHoursForm').reset();
+        }
+        async function submitSecurityLog(event) {
+            event.preventDefault();
+
+            const log = {
+                date: document.getElementById('logDate').value,
+                time: document.getElementById('logTime').value,
+                location: document.getElementById('logLocation').value,
+                description: document.getElementById('logDescription').value,
+                initials: document.getElementById('logInitials').value
+            };
+
+            const res = await fetch('/api/security-logs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(log)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            document.getElementById('securityLogForm').reset();
+            loadSecurityLogs();
+        }
+
+        async function loadSecurityLogs(date = '', initials = '') {
+            try {
+                let url = '/api/security-logs';
+                const params = [];
+                if (date) params.push(`date=${encodeURIComponent(date)}`);
+                if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
+                if (params.length) url += '?' + params.join('&');
+
+                const res = await fetch(url, { credentials: 'include' });
+                const logs = await res.json();
+
+                const container = document.getElementById('securityLogsContainer');
+                if (!logs.length) {
+                    container.innerHTML = '<p>No logs found for selected criteria.</p>';
+                    return;
+                }
+
+                container.innerHTML = logs.map(log => `
+      <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
+        <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
+        ${log.description}<br>
+        <small>Initials: ${log.initials} | Submitted by: ${log.submittedBy}</small>
+      </div>
+    `).join('');
+            } catch (err) {
+                console.error('Failed to load security logs:', err);
+            }
+        }
+
+
+        // Load logs automatically on page load
+        document.addEventListener('DOMContentLoaded', loadSecurityLogs);
+        function filterSecurityLogs() {
+            const date = document.getElementById('filterDate').value;
+            const initials = document.getElementById('filterInitials').value;
+            loadSecurityLogs(date, initials);
+        }
+
+        function clearSecurityFilters() {
+            document.getElementById('filterDate').value = '';
+            document.getElementById('filterInitials').value = '';
+            loadSecurityLogs();
+        }
+
+        function exportSecurityLogs() {
+            const date = document.getElementById('filterDate').value;
+            const initials = document.getElementById('filterInitials').value;
+
+            let url = '/api/security-logs?format=csv';
+            if (date) url += `&date=${encodeURIComponent(date)}`;
+            if (initials) url += `&initials=${encodeURIComponent(initials)}`;
+
+            window.open(url, '_blank');
         }
 
         async function claimShift(id) {
