@@ -145,6 +145,31 @@
     `).join('')}
   `;
       }
+      async function filterLogs() {
+          const date = document.getElementById('filterDate').value;
+          try {
+              const res = await fetch('/api/logs-by-date?date=' + date, { credentials: 'include' });
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              const logs = await res.json();
+              const tbody = document.getElementById('logBody');
+              tbody.innerHTML = '';
+
+              logs.forEach(log => {
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+        <td>${log.username}</td>
+        <td>${log.date}</td>
+        <td>${log.hours}</td>
+        <td>${log.description || ''}</td>`;
+                  tbody.appendChild(row);
+              });
+
+              if (logs.length === 0) tbody.innerHTML = '<tr><td colspan="4">No logs found.</td></tr>';
+          } catch (err) {
+              console.error('Failed to load logs:', err);
+              alert('Failed to load logs.');
+          }
+      }
 
 
       function clearFilters() {
