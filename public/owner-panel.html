@@ -105,6 +105,50 @@
         background: #c5303d;
         transform: scale(1.05);
     }
+    /* ───── Toolbar for bulk delete ───── */
+    #toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #252525;
+        padding: 10px 16px;
+        border-bottom: 2px solid #e63946;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        opacity: 1;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    #toolbar.hidden {
+        opacity: 0;
+        transform: translateY(-100%);
+        pointer-events: none;
+    }
+
+    #toolbar button {
+        background: #e63946;
+        color: white;
+        font-weight: bold;
+        padding: 10px 16px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    #toolbar button:hover {
+        background: #c5303d;
+        transform: scale(1.05);
+    }
+
+    #selectedCount {
+        font-size: 15px;
+        color: #f2f2f2;
+    }
+
 
   </style>
 </head>
@@ -163,21 +207,26 @@
           }
 
           container.innerHTML = `
-    <button onclick="deleteSelectedShifts()" style="margin-bottom:10px;">🗑 Delete Selected</button>
-    ${filtered.map(s => `
-     <div class="shift" style="display:flex; justify-content:space-between; align-items:center; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
-  <div style="flex:1;">
-    <input type="checkbox" class="shift-checkbox" value="${s._id}" style="margin-right:10px;">
-    <strong>${s.date} at ${s.time}</strong><br>
-    Location: ${s.location}<br>
-    Notes: ${s.notes || 'None'}<br>
-    Claimed by: ${s.claimedBy || 'Not claimed yet'}
-  </div>
-  <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
+  <div id="toolbar" class="hidden">
+  <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
+  <span id="selectedCount">0 selected</span>
 </div>
-
+  <div id="shiftContainer">
+    ${filtered.map(s => `
+      <div class="shift" style="display:flex; justify-content:space-between; align-items:center; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
+        <div style="flex:1;">
+          <input type="checkbox" class="shift-checkbox" value="${s._id}" style="margin-right:10px;" onchange="updateSelectedCount()">
+          <strong>${s.date} at ${s.time}</strong><br>
+          Location: ${s.location}<br>
+          Notes: ${s.notes || 'None'}<br>
+          Claimed by: ${s.claimedBy || 'Not claimed yet'}
+        </div>
+        <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
+      </div>
     `).join('')}
-  `;
+  </div>
+`;
+
       }
       async function filterLogs() {
           const date = document.getElementById('filterDate').value;
@@ -357,6 +406,23 @@
           const data = await res.json();
           alert(data.message);
           loadShifts();
+      }
+      function updateSelectedCount() {
+          const checkboxes = document.querySelectorAll('.shift-checkbox');
+          const checked = document.querySelectorAll('.shift-checkbox:checked').length;
+          const counter = document.getElementById('selectedCount');
+          const toolbar = document.getElementById('toolbar');
+
+          if (counter) counter.textContent = `${checked} selected`;
+
+          // Show or hide toolbar dynamically
+          if (toolbar) {
+              if (checked > 0) {
+                  toolbar.classList.remove('hidden');
+              } else {
+                  toolbar.classList.add('hidden');
+              }
+          }
       }
 
     function goToAdmin() {
