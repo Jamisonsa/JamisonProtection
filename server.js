@@ -159,10 +159,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ────── Session Debug ──────
 app.get('/api/session-debug', (req, res) => {
-  res.json({
-    user: req.session.user || null,
-    role: req.session.role || null
-  });
+    const user = req.session.user || null;
+    res.json({
+        user,
+        role: user ? user.role : null
+    });
 });
 
 // ────── Role Switch Routes ──────
@@ -240,15 +241,14 @@ app.post('/api/admin/create-user', requireLogin, isOwner, async (req, res) => {
             return res.status(400).json({ message: 'All fields are required.' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({
             username,
-            password: hashedPassword,
+            password,
             role,
-            hourlyRate: hourlyRate || 20
+            hourlyRate: hourlyRate || 25
         });
+        await user.save(); // the model will hash it automatically
 
-        await user.save();
         console.log(`👤 Created ${role}: ${username} ($${hourlyRate}/hr)`);
         res.json({ message: `User ${username} created successfully with $${hourlyRate}/hr rate.` });
     } catch (err) {
