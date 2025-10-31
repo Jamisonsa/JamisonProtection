@@ -151,33 +151,57 @@ app.get('/api/session-debug', (req, res) => {
 
 // ────── Role Switch Routes ──────
 
-// Allow owner to switch viewing mode
-app.post('/api/switch-to-worker', (req, res) => {
+// ───── Role Switch Routes ─────
+
+// Owner temporarily views as worker
+app.post('/api/switch-to-worker', requireLogin, (req, res) => {
     if (req.session.role !== 'owner') {
         return res.status(403).json({ message: 'Only owner can switch to worker view' });
     }
-
-    // ✅ Keep actual role as "owner"
     req.session.viewMode = 'worker';
     res.status(200).json({ message: 'Now viewing as worker', viewMode: 'worker' });
 });
 
-app.post('/api/switch-to-owner', (req, res) => {
+// Owner restores full owner/admin access
+app.post('/api/switch-to-owner', requireLogin, (req, res) => {
     if (req.session.role !== 'owner') {
         return res.status(403).json({ message: 'Only owner can switch to owner view' });
     }
 
-    // ✅ Keep actual role as "owner"
-    req.session.viewMode = 'owner';
-    res.status(200).json({ message: 'Now viewing as owner', viewMode: 'owner' });
-});
+    // ✅ Fully restore owner access
+    req.session.viewMode = null;
+    req.session.role = 'owner';
 
+    req.session.save(err => {
+        if (err) return res.status(500).json({ message: 'Failed to restore session' });
+        res.status(200).json({ message: 'Now viewing as owner', viewMode: 'owner' });
+    });
+});
+app.get('/api/whoami', (req, res) => {
+    res.json({
+        user: req.session.user,
+        role: req.session.role,
+        viewMode: req.session.viewMode
+    });
+});
 
 // ─── User Management (Admin Panel) ───
 // ─── Admin: Create, Delete, Update Users ───
 app.get('/api/users', requireLogin, isOwner, async (_req, res) => {
   const users = await User.find({}, { password: 0 }); // hide password
   res.json(users);
+});
+// Delete a shift (Owner only)
+app.delete('/api/delete-shift/:id', requireLogin, isOwner, async (req, res) => {
+    try {
+        const shiftId = req.params.id;
+        const deleted = await Shift.findByIdAndDelete(shiftId);
+        if (!deleted) return res.status(404).json({ message: 'Shift not found' });
+        res.json({ message: 'Shift deleted successfully' });
+    } catch (err) {
+        console.error('Delete shift error:', err);
+        res.status(500).json({ message: 'Failed to delete shift' });
+    }
 });
 
 app.post('/api/users', requireLogin, isOwner, async (req, res) => {
