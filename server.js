@@ -184,6 +184,20 @@ app.get('/api/whoami', (req, res) => {
         viewMode: req.session.viewMode
     });
 });
+app.delete('/api/delete-multiple-shifts', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids)) {
+            return res.status(400).json({ message: 'Invalid shift ID list' });
+        }
+
+        const result = await Shift.deleteMany({ _id: { $in: ids } });
+        res.json({ message: `Deleted ${result.deletedCount} shifts successfully.` });
+    } catch (err) {
+        console.error('Bulk delete error:', err);
+        res.status(500).json({ message: 'Failed to delete shifts' });
+    }
+});
 
 // ─── User Management (Admin Panel) ───
 // ─── Admin: Create, Delete, Update Users ───

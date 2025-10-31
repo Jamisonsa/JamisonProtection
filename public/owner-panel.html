@@ -131,16 +131,21 @@
               return;
           }
 
-          container.innerHTML = filtered.map(s => `
-    <div class="shift" style="background:#1f1f1f; padding:10px; margin:8px 0; border-left:4px solid ${s.claimedBy ? '#e63946' : '#444'};">
-      <strong>${s.date} at ${s.time}</strong><br>
-      Location: ${s.location}<br>
-      Notes: ${s.notes || 'None'}<br>
-      Claimed by: ${s.claimedBy || 'Not claimed yet'}<br>
-      <button onclick="deleteShift('${s._id}')">🗑 Delete</button>
-    </div>
-  `).join('');
+          container.innerHTML = `
+    <button onclick="deleteSelectedShifts()" style="margin-bottom:10px;">🗑 Delete Selected</button>
+    ${filtered.map(s => `
+      <div class="shift" style="background:#1f1f1f; padding:10px; margin:8px 0; border-left:4px solid ${s.claimedBy ? '#e63946' : '#444'};">
+        <input type="checkbox" class="shift-checkbox" value="${s._id}" style="margin-right:10px;">
+        <strong>${s.date} at ${s.time}</strong><br>
+        Location: ${s.location}<br>
+        Notes: ${s.notes || 'None'}<br>
+        Claimed by: ${s.claimedBy || 'Not claimed yet'}<br>
+        <button onclick="deleteShift('${s._id}')">Delete</button>
+      </div>
+    `).join('')}
+  `;
       }
+
 
       function clearFilters() {
           document.getElementById('filterName').value = '';
@@ -276,6 +281,24 @@
           loadShifts();
       }
 
+      async function deleteSelectedShifts() {
+          const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
+          if (checkboxes.length === 0) return alert('No shifts selected.');
+
+          if (!confirm(`Delete ${checkboxes.length} selected shifts?`)) return;
+
+          const ids = Array.from(checkboxes).map(cb => cb.value);
+          const res = await fetch('/api/delete-multiple-shifts', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ ids })
+          });
+
+          const data = await res.json();
+          alert(data.message);
+          loadShifts();
+      }
 
     function goToAdmin() {
       fetch('/api/verify-owner', {
