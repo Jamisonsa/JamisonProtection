@@ -216,6 +216,14 @@
         background: #2e2e2e;
         font-weight: bold;
     }
+    #submittedHoursContainer {
+        transition: all 0.3s ease-in-out;
+        overflow: hidden;
+        background: #1f1f1f;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+    }
 
   </style>
 </head>
@@ -269,9 +277,25 @@
 
       <div id="shiftList"></div>
       <hr>
-      <div id="submittedHoursContainer">
-      <p>Click "View Submitted Hours" to load data.</p>
-  </div>
+
+      <div id="submittedHoursContainer" style="display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3>Submitted Hours</h3>
+              <button onclick="closeSubmittedHours()" style="
+      background:#e63946;
+      color:white;
+      border:none;
+      padding:6px 12px;
+      border-radius:5px;
+      cursor:pointer;
+      font-weight:bold;
+    ">Close ✖</button>
+          </div>
+          <div id="submittedHoursContent">
+              <p>Loading...</p>
+          </div>
+      </div>
+
       <hr>
       <div id="payrollTab" class="tab" style="display:none;">
           <h2>Weekly Payroll Summary</h2>
@@ -417,51 +441,65 @@
           }
       }
       async function viewSubmittedHours() {
-          const res = await fetch('/api/view-logs', { credentials: 'include' });
-          if (!res.ok) {
-              alert('Failed to load logs.');
-              return;
-          }
-          const data = await res.json();
-
           const container = document.getElementById('submittedHoursContainer');
-          if (!container) return;
+          const content = document.getElementById('submittedHoursContent');
 
-          if (!Object.keys(data).length) {
-              container.innerHTML = '<p>No submitted hours found.</p>';
-              return;
-          }
+          // Show the container
+          container.style.display = 'block';
+          content.innerHTML = '<p>Loading submitted logs...</p>';
 
-          container.innerHTML = Object.entries(data).map(([user, logs]) => `
-    <div class="payroll-card">
-      <h3>${user}</h3>
-      <table class="payroll-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Location</th>
-            <th>Position</th>
-            <th>Hours</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${logs.map(l => `
+          try {
+              const res = await fetch('/api/view-logs', { credentials: 'include' });
+              if (!res.ok) {
+                  content.innerHTML = '<p>Failed to load logs.</p>';
+                  return;
+              }
+              const data = await res.json();
+
+              if (!Object.keys(data).length) {
+                  content.innerHTML = '<p>No submitted hours found.</p>';
+                  return;
+              }
+
+              content.innerHTML = Object.entries(data).map(([user, logs]) => `
+      <div class="payroll-card">
+        <h3>${user}</h3>
+        <table class="payroll-table">
+          <thead>
             <tr>
-              <td>${l.date}</td>
-              <td>${l.startTime}</td>
-              <td>${l.endTime}</td>
-              <td>${l.location}</td>
-              <td>${l.position}</td>
-              <td>${l.hours}</td>
+              <th>Date</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Location</th>
+              <th>Position</th>
+              <th>Hours</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `).join('');
+          </thead>
+          <tbody>
+            ${logs.map(l => `
+              <tr>
+                <td>${l.date}</td>
+                <td>${l.startTime}</td>
+                <td>${l.endTime}</td>
+                <td>${l.location}</td>
+                <td>${l.position}</td>
+                <td>${l.hours}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('');
+          } catch (err) {
+              console.error('Error fetching logs:', err);
+              content.innerHTML = '<p>Error loading logs.</p>';
+          }
       }
+      function closeSubmittedHours() {
+          const container = document.getElementById('submittedHoursContainer');
+          container.style.display = 'none';
+      }
+
 
 
       function clearFilters() {

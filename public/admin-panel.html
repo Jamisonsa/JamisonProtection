@@ -59,7 +59,7 @@
 
 <!-- Add New User -->
 <h2>Add New User</h2>
-<form id="addUserForm">
+<form id="addUserForm" onsubmit="createUser(event)">
     <input type="text" id="newUsername" placeholder="Username" required>
     <input type="text" id="newPassword" placeholder="Password" required>
     <select id="newRole">
