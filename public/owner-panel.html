@@ -223,14 +223,13 @@
   <header>
     <h1>Owner Panel</h1>
       <nav>
-          <button onclick="showTab('shifts')">Shifts</button>
           <button onclick="showTab('securityLogs')">Security Logs</button>
           <button onclick="showTab('payroll')">Payroll</button>
       </nav>
       <button class="logout-btn" onclick="logout()">Logout</button>
     <button class="switch-btn" onclick="switchToWorker()">Switch to Worker View</button>
     <button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
-    <button onclick="loadLogs()" class="admin-btn">View Submitted Hours</button>
+      <button onclick="viewSubmittedHours()">View Submitted Hours</button>
   </header>
 
   <main>
@@ -269,6 +268,10 @@
       </div>
 
       <div id="shiftList"></div>
+      <hr>
+      <div id="submittedHoursContainer">
+      <p>Click "View Submitted Hours" to load data.</p>
+  </div>
       <hr>
       <div id="payrollTab" class="tab" style="display:none;">
           <h2>Weekly Payroll Summary</h2>
@@ -373,16 +376,16 @@
 </div>
   <div id="shiftContainer">
     ${filtered.map(s => `
-      <div class="shift" style="display:flex; justify-content:space-between; align-items:center; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
-        <div style="flex:1;">
-          <input type="checkbox" class="shift-checkbox" value="${s._id}" style="margin-right:10px;" onchange="updateSelectedCount()">
-          <strong>${s.date} at ${s.time}</strong><br>
-          Location: ${s.location}<br>
-          Notes: ${s.notes || 'None'}<br>
-          Claimed by: ${s.claimedBy || 'Not claimed yet'}
-        </div>
-        <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
-      </div>
+   <div class="shift" style="display:flex; justify-content:space-between; align-items:center; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
+    <div>
+      <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
+      Location: ${s.location || 'Unknown'}<br>
+      Position: ${s.position || 'Unassigned'}<br>
+      Notes: ${s.notes || 'None'}<br>
+      Claimed by: ${s.claimedBy || 'Not claimed yet'}
+    </div>
+    <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
+  </div>
     `).join('')}
   </div>
 `;
@@ -412,6 +415,52 @@
               console.error('Failed to load logs:', err);
               alert('Failed to load logs.');
           }
+      }
+      async function viewSubmittedHours() {
+          const res = await fetch('/api/view-logs', { credentials: 'include' });
+          if (!res.ok) {
+              alert('Failed to load logs.');
+              return;
+          }
+          const data = await res.json();
+
+          const container = document.getElementById('submittedHoursContainer');
+          if (!container) return;
+
+          if (!Object.keys(data).length) {
+              container.innerHTML = '<p>No submitted hours found.</p>';
+              return;
+          }
+
+          container.innerHTML = Object.entries(data).map(([user, logs]) => `
+    <div class="payroll-card">
+      <h3>${user}</h3>
+      <table class="payroll-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Location</th>
+            <th>Position</th>
+            <th>Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${logs.map(l => `
+            <tr>
+              <td>${l.date}</td>
+              <td>${l.startTime}</td>
+              <td>${l.endTime}</td>
+              <td>${l.location}</td>
+              <td>${l.position}</td>
+              <td>${l.hours}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
       }
 
 
