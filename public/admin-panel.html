@@ -74,6 +74,7 @@
     </label>
     <button type="submit">Add User</button>
 </form>
+<button class="sms-btn" onclick="toggleSmsAlerts()">Enable SMS Alerts</button>
 
 <!-- User List -->
 <h2>All Users</h2>
@@ -132,6 +133,23 @@
 
         // Refresh user list
         fetchUsers();
+    }
+    async function toggleSmsAlerts() {
+        const username = prompt('Enter the username to toggle SMS alerts for:');
+        if (!username) return;
+
+        const enable = confirm('Click OK to ENABLE SMS alerts, or Cancel to DISABLE.');
+
+        const res = await fetch('/api/admin/toggle-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, enable })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        fetchUsers(); // refresh the user list
     }
 
 

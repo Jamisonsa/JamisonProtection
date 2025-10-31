@@ -256,6 +256,25 @@ app.post('/api/admin/create-user', requireLogin, isOwner, async (req, res) => {
         res.status(500).json({ message: 'Error creating user.' });
     }
 });
+// ─── Toggle SMS Alerts ───
+app.post('/api/admin/toggle-sms', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { username, enable } = req.body;
+        if (!username) return res.status(400).json({ message: 'Username is required' });
+
+        const user = await User.findOne({ username });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.notifySms = enable;
+        await user.save();
+
+        console.log(`📱 SMS Alerts ${enable ? 'enabled' : 'disabled'} for ${username}`);
+        res.json({ message: `SMS alerts ${enable ? 'enabled' : 'disabled'} for ${username}` });
+    } catch (err) {
+        console.error('Error toggling SMS:', err);
+        res.status(500).json({ message: 'Error updating SMS setting' });
+    }
+});
 
 
 app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
