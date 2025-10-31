@@ -106,6 +106,19 @@
         #securityLogFilter button:hover {
             background: #c5303d;
         }
+        #logHoursForm {
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 5px solid #4CAF50;
+        }
+        #logHoursForm button {
+            background: #4CAF50;
+        }
+        #logHoursForm button:hover {
+            background: #3e8e41;
+        }
 
     </style>
 </head>
@@ -123,6 +136,33 @@
 
     <h2>My Shifts</h2>
     <div id="myShiftList"></div>
+    <h2>Log Your Hours</h2>
+    <form id="logHoursForm" onsubmit="submitHours(event)">
+        <label>Date:</label>
+        <input type="date" id="logDate" required><br><br>
+
+        <label>Start Time:</label>
+        <input type="time" id="logStart" required><br><br>
+
+        <label>End Time:</label>
+        <input type="time" id="logEnd" required><br><br>
+
+        <label>Location:</label>
+        <select id="logLocation" required>
+            <option value="John Carroll School">John Carroll School</option>
+        </select><br><br>
+
+        <label>Work Position:</label>
+        <input type="text" id="logPosition" placeholder="e.g. Front Gate Security" required><br><br>
+
+        <label>Hours Worked:</label>
+        <input type="number" id="logHours" step="0.1" placeholder="e.g. 5.5" required><br><br>
+
+        <button type="submit" class="submit-btn">Submit Hours</button>
+    </form>
+
+    <hr>
+
     <h2>Daily Security Log</h2>
     <form id="securityLogForm" onsubmit="submitSecurityLog(event)">
         <label>Date:</label>
