@@ -61,7 +61,20 @@
       margin: 15px 0;
       padding: 15px;
       border-left: 5px solid #1c1c1c;
+    }/* Delete button style */
+    .shift button {
+        background: #e63946;
+        border: none;
+        padding: 6px 10px;
+        color: white;
+        border-radius: 4px;
+        margin-top: 6px;
+        cursor: pointer;
     }
+    .shift button:hover {
+        background: #c5303d;
+    }
+
   </style>
 </head>
 <body>
@@ -83,35 +96,58 @@
       <button type="submit">Post Shift</button>
     </form>
 
-    <h2>All Shifts</h2>
-    <div id="shiftList"></div>
+      <h2>All Shifts</h2>
 
-    <div id="logContainer" style="margin-top: 30px;"></div>
+      <div style="margin-bottom: 15px;">
+          <input type="text" id="filterName" placeholder="Filter by worker name..." style="padding:6px; width:200px;">
+          <input type="date" id="filterDate" style="padding:6px;">
+          <button onclick="loadShifts()">Apply Filter</button>
+          <button onclick="clearFilters()">Clear</button>
+      </div>
+
+      <div id="shiftList"></div>
+
   </main>
 
   <script>
-    async function loadShifts() {
-      const res = await fetch('/api/view-all-shifts', {
-        credentials: 'include'
-      });
-      if (res.status === 401) return location.href = 'login.html';
+      async function loadShifts() {
+          const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
+          const date = document.getElementById('filterDate')?.value || '';
 
-      const shifts = await res.json();
-      const container = document.getElementById('shiftList');
-      container.innerHTML = '';
+          const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
+          if (res.status === 401) return location.href = 'login.html';
 
-      shifts.forEach(shift => {
-        const div = document.createElement('div');
-        div.className = 'shift';
-        div.innerHTML = `
-          <strong>${shift.date} at ${shift.time}</strong><br>
-          Location: ${shift.location}<br>
-          Notes: ${shift.notes || 'None'}<br>
-          Claimed by: ${shift.claimedBy || 'Not claimed yet'}
-        `;
-        container.appendChild(div);
-      });
-    }
+          const shifts = await res.json();
+
+          const filtered = shifts.filter(s => {
+              const matchName = !name || (s.claimedBy && s.claimedBy.toLowerCase().includes(name));
+              const matchDate = !date || s.date === date;
+              return matchName && matchDate;
+          });
+
+          const container = document.getElementById('shiftList');
+          if (filtered.length === 0) {
+              container.innerHTML = '<p>No shifts found.</p>';
+              return;
+          }
+
+          container.innerHTML = filtered.map(s => `
+    <div class="shift" style="background:#1f1f1f; padding:10px; margin:8px 0; border-left:4px solid ${s.claimedBy ? '#e63946' : '#444'};">
+      <strong>${s.date} at ${s.time}</strong><br>
+      Location: ${s.location}<br>
+      Notes: ${s.notes || 'None'}<br>
+      Claimed by: ${s.claimedBy || 'Not claimed yet'}<br>
+      <button onclick="deleteShift('${s._id}')">🗑 Delete</button>
+    </div>
+  `).join('');
+      }
+
+      function clearFilters() {
+          document.getElementById('filterName').value = '';
+          document.getElementById('filterDate').value = '';
+          loadShifts();
+      }
+
         async function loadDroppedShifts() {
         const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
         const all = await res.json();
@@ -229,6 +265,16 @@
             .then(res => res.ok ? (location.href = 'worker-dashboard.html') : alert('Only owner can switch.'))
             .catch(err => alert('Switch failed: ' + err.message));
     }
+      async function deleteShift(id) {
+          if (!confirm('Are you sure you want to delete this shift?')) return;
+          const res = await fetch(`/api/delete-shift/${id}`, {
+              method: 'DELETE',
+              credentials: 'include'
+          });
+          const data = await res.json();
+          alert(data.message);
+          loadShifts();
+      }
 
 
     function goToAdmin() {
