@@ -4,9 +4,11 @@ const bcrypt = require('bcrypt');
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['owner', 'worker', 'admin'], default: 'worker' },
+    role: { type: String, enum: ['owner', 'worker'], default: 'worker' },
     phone: { type: String, default: null },            // E.164 format: +14435551234
-    notifySms: { type: Boolean, default: false }       // user can opt-in/out
+    notifySms: { type: Boolean, default: false },       // user can opt-in/out
+// in user.js or User schema section
+    hourlyRate: { type: Number, default: 25 } // 💰 Default hourly pay
 });
 
 // Hash password before saving
