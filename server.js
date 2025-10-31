@@ -81,11 +81,15 @@ const Shift = mongoose.model('Shift', new mongoose.Schema({
 
 
 const Log = mongoose.model('Log', new mongoose.Schema({
-  username: String,
-  date: String,
-  hours: Number,
-  description: String   
+    user: String,
+    date: String,
+    startTime: String,
+    endTime: String,
+    location: String,
+    position: String,
+    hours: Number
 }));
+
 
 // ────── Seed Users ──────
 async function seedUsers() {
@@ -315,15 +319,6 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     notifyUsersOfNewShift(shift).catch(() => {});
     res.json({ message: 'Shift posted' });
 });
-const Log = mongoose.model('Log', new mongoose.Schema({
-    user: String,
-    date: String,
-    startTime: String,
-    endTime: String,
-    location: String,
-    position: String,
-    hours: Number
-}));
 
 app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
   const shifts = await Shift.find();
