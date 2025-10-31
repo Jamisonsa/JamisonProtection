@@ -331,9 +331,15 @@ app.post('/api/login', async (req, res) => {
         }
 
         req.session.user = { username: user.username, role: user.role };
+        req.session.role = user.role;  // ✅ store role separately for middleware
+
         console.log(`✅ ${user.username} logged in as ${user.role}`);
 
-        res.json({ message: 'Login successful', role: user.role });
+        req.session.save(err => {
+            if (err) console.error('Session save error:', err);
+            res.json({ message: 'Login successful', role: user.role });
+        });
+
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ message: 'Server error during login' });
