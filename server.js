@@ -439,16 +439,52 @@ app.post('/api/repost-shift', requireLogin, isOwner, async (req, res) => {
 });
 
 // ────── Log Hours ──────
-app.post('/api/log-hours', requireLogin, isWorker, async (req, res) => {
-  const { date, hours, description } = req.body;
-  await Log.create({ username: req.session.user, date, hours, description });
-  res.json({ message: 'Hours logged' });
+// ─── Worker Log Hours ───
+app.post('/api/log-hours', requireLogin, async (req, res) => {
+    try {
+        const { date, startTime, endTime, location, position, hours } = req.body;
+        const user = req.session.user?.username || req.session.user || 'Unknown';
+
+        const newLog = new Log({
+            user,
+            date,
+            startTime,
+            endTime,
+            location,
+            position,
+            hours
+        });
+
+        await newLog.save();
+        console.log(`🕒 Hours logged by ${user}: ${hours} hrs on ${date}`);
+        res.json({ message: 'Hours logged successfully' });
+    } catch (err) {
+        console.error('Error logging hours:', err);
+        res.status(500).json({ message: 'Failed to log hours' });
+    }
 });
 
-app.get('/api/view-logs', requireLogin, isOwner, async (_req, res) => {
-  const logs = await Log.find();
-  res.json(logs);
+
+// ─── View Submitted Hours ───
+app.get('/api/view-logs', requireLogin, isOwner, async (req, res) => {
+    try {
+        const logs = await Log.find().sort({ date: -1 });
+        if (!logs.length) return res.json([]);
+
+        const grouped = {};
+        logs.forEach(log => {
+            const user = log.user || 'Unknown';
+            if (!grouped[user]) grouped[user] = [];
+            grouped[user].push(log);
+        });
+
+        res.json(grouped);
+    } catch (err) {
+        console.error('Error loading logs:', err);
+        res.status(500).json({ message: 'Failed to load logs' });
+    }
 });
+
 app.get('/api/logs-by-date', requireLogin, isOwner, async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ message: 'Date is required' });
