@@ -60,11 +60,12 @@
     </style>
 </head>
 <body>
-<header>
-    <h1>Worker Dashboard</h1>
-    <button class="logout-btn" onclick="logout()">Logout</button>
-    <button onclick="switchToOwner()">Switch to Owner View</button>
-</header>
+
+    <header>
+        <h1 id="welcomeMsg">Worker Dashboard</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+        <button onclick="switchToOwner()">Switch to Owner View</button>
+    </header>
 
 <main>
     <h2>Available Shifts</h2>
@@ -83,113 +84,114 @@
 </main>
 
 <script>
-    async function loadShifts() {
+        async function loadShifts() {
         const res = await fetch('/api/shifts', { credentials: 'include' });
         if (res.status === 401) return (location.href = 'login.html');
         const shifts = await res.json();
-        const container = document.getElementById('shiftList');
+        const available = shifts.filter(s => s.status !== 'claimed');
 
-        container.innerHTML = shifts.length
-            ? shifts.map(s => `
-      <div class="shift">
-        <strong>${s.date} at ${s.time}</strong><br>
-        Location: ${s.location}<br>
-        Notes: ${s.notes || 'None'}<br>
-        Status: ${s.status}<br>
-        <button onclick="claimShift('${s._id}')">Claim</button>
-      </div>
-    `).join('')
-            : '<p>No available shifts at this time.</p>';
+        const container = document.getElementById('shiftList');
+        container.innerHTML = available.length
+        ? available.map(s => `
+                <div class="shift">
+                    <strong>${s.date} at ${s.time}</strong><br>
+                    Location: ${s.location}<br>
+                    Notes: ${s.notes || 'None'}<br>
+                    Status: ${s.status}<br>
+                    <button onclick="claimShift('${s._id}')">Claim</button>
+                </div>
+            `).join('')
+        : '<p>No available shifts at this time.</p>';
     }
 
-    async function loadMyShifts() {
+        async function loadMyShifts() {
         const res = await fetch('/api/my-shifts', { credentials: 'include' });
         if (res.status === 401) return (location.href = 'login.html');
         const shifts = await res.json();
+
         const container = document.getElementById('myShiftList');
-
         container.innerHTML = shifts.length
-            ? shifts.map(s => `
-      <div class="shift">
-        <strong>${s.date} at ${s.time}</strong><br>
-        Location: ${s.location}<br>
-        Notes: ${s.notes || 'None'}<br>
-        <button onclick="dropShift('${s._id}')">Drop Shift</button>
-      </div>
-    `).join('')
-            : '<p>You have no claimed shifts.</p>';
-    }
-    async function logout() {
-        try {
-            const res = await fetch('/logout', {
-                method: 'POST',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                window.location.href = 'login.html';
-            } else {
-                alert('Logout failed.');
-            }
-        } catch (err) {
-            alert('Error logging out: ' + err.message);
-        }
-    }
-    async function switchToOwner() {
-        try {
-            const res = await fetch('/api/switch-to-owner', {
-                method: 'POST',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                // ✅ Redirect to owner panel if allowed
-                window.location.href = 'owner-panel.html';
-            } else {
-                const data = await res.json();
-                alert(data.message || 'Only owners can switch to owner view.');
-            }
-        } catch (err) {
-            alert('Error switching view: ' + err.message);
-        }
+        ? shifts.map(s => `
+                <div class="shift">
+                    <strong>${s.date} at ${s.time}</strong><br>
+                    Location: ${s.location}<br>
+                    Notes: ${s.notes || 'None'}<br>
+                    <button onclick="dropShift('${s._id}')">Drop Shift</button>
+                </div>
+            `).join('')
+        : '<p>You have no claimed shifts.</p>';
     }
 
-    async function claimShift(id) {
+        async function claimShift(id) {
         const res = await fetch('/api/claim', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ shiftId: id })
-        });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ shiftId: id })
+    });
         const data = await res.json();
         alert(data.message);
         await loadShifts();
         await loadMyShifts();
     }
 
-    async function dropShift(shiftId) {
+        async function dropShift(shiftId) {
         const res = await fetch('/api/drop', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ shiftId })
-        });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ shiftId })
+    });
         const data = await res.json();
         alert(data.message);
         await loadShifts();
         await loadMyShifts();
     }
 
-    // Check session and initialize
-    fetch('/api/session-debug', { credentials: 'include' })
+        async function logout() {
+        try {
+        const res = await fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+    });
+        if (res.ok) {
+        window.location.href = 'login.html';
+    } else {
+        alert('Logout failed.');
+    }
+    } catch (err) {
+        alert('Error logging out: ' + err.message);
+    }
+    }
+
+        async function switchToOwner() {
+        try {
+        const res = await fetch('/api/switch-to-owner', {
+        method: 'POST',
+        credentials: 'include'
+    });
+        if (res.ok) {
+        window.location.href = 'owner-panel.html';
+    } else {
+        const data = await res.json();
+        alert(data.message || 'Only owners can switch to owner view.');
+    }
+    } catch (err) {
+        alert('Error switching view: ' + err.message);
+    }
+    }
+
+        // ✅ Fixed session check — safely loads shifts after login
+        fetch('/api/session-debug', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
-            if (!data.user) {
-                location.href = 'login.html';
-                return;
-            }
-            document.getElementById('welcomeMsg').textContent = `Welcome, ${data.user}`;
-            loadShifts();
-            loadMyShifts();
-        });
+        if (!data.user) return (location.href = 'login.html');
+        console.log('Logged in as:', data.user);
+        loadShifts();
+        loadMyShifts();
+    })
+        .catch(err => console.error('Session check failed:', err));
+
 </script>
 
 </body>

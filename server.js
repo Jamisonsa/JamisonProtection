@@ -151,8 +151,6 @@ app.get('/api/session-debug', (req, res) => {
 
 // ────── Role Switch Routes ──────
 
-// ───── Role Switch Routes ─────
-
 // Owner temporarily views as worker
 app.post('/api/switch-to-worker', requireLogin, (req, res) => {
     if (req.session.role !== 'owner') {
@@ -305,15 +303,13 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     });
     await shift.save();
 
+    console.log(`✅ New shift posted by ${req.session.user}: ${date} ${time} at ${location}`);
+
     notifyUsersOfNewShift(shift).catch(() => {});
     res.json({ message: 'Shift posted' });
 });
 
 
-app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
-  const shifts = await Shift.find({ claimedBy: null });
-  res.json(shifts);
-});
 
 app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
   const shifts = await Shift.find();
@@ -415,6 +411,8 @@ app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
         claimedBy: null,
         status: { $in: ['available', 'dropped'] }
     }).sort({ date: 1, time: 1 });
+    console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
+
     res.json(shifts);
 });
 
