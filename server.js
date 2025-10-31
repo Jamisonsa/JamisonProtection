@@ -231,19 +231,31 @@ app.delete('/api/delete-shift/:id', requireLogin, isOwner, async (req, res) => {
     }
 });
 
-app.post('/api/users', requireLogin, isOwner, async (req, res) => {
-  const { username, password, role } = req.body;
-  if (!username || !password || !role) {
-    return res.status(400).json({ message: 'Missing fields' });
-  }
+app.post('/api/admin/create-user', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { username, password, role, hourlyRate } = req.body;
 
-  const exists = await User.findOne({ username });
-  if (exists) return res.status(400).json({ message: 'User already exists' });
+        if (!username || !password || !role) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
 
-  const newUser = new User({ username, password, role });
-  await newUser.save();
-  res.json({ message: 'User created' });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({
+            username,
+            password: hashedPassword,
+            role,
+            hourlyRate: hourlyRate || 20
+        });
+
+        await user.save();
+        console.log(`👤 Created ${role}: ${username} ($${hourlyRate}/hr)`);
+        res.json({ message: `User ${username} created successfully with $${hourlyRate}/hr rate.` });
+    } catch (err) {
+        console.error('Error creating user:', err);
+        res.status(500).json({ message: 'Error creating user.' });
+    }
 });
+
 
 app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
