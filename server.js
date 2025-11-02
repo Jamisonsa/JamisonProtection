@@ -979,6 +979,21 @@ app.get('/api/interviews', requireLogin, isOwner, async (_req, res) => {
     }
 });
 
+// ─── Serve uploaded resume/cover files securely ───
+app.get('/api/interviews/file/:filename', requireLogin, isOwner, (req, res) => {
+    try {
+        const filePath = path.join(__dirname, 'uploads', req.params.filename);
+        res.sendFile(filePath, err => {
+            if (err) {
+                console.error('File send error:', err);
+                res.status(404).send('File not found');
+            }
+        });
+    } catch (err) {
+        console.error('Error serving file:', err);
+        res.status(500).send('Server error');
+    }
+});
 
 // ────── Start Server ──────
 app.listen(PORT, () => {
