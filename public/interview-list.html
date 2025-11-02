@@ -85,6 +85,11 @@
             font-size: 13px;
             color: #aaa;
         }
+        /* Highlight scheduled interviews */
+        tr.scheduled td {
+            background-color: #18392b;
+        }
+
     </style>
 </head>
 <body>
@@ -94,6 +99,8 @@
 </header>
 
 <main>
+    <input type="text" id="searchBox" placeholder="Search name or email..." oninput="filterInterviews()" style="padding:8px; margin-bottom:10px; width:250px; border-radius:5px;">
+
     <table id="interviewTable">
         <thead>
         <tr>
@@ -119,7 +126,7 @@
     }
 
     async function loadInterviews() {
-        const res = await fetch('/api/interviews', { credentials: 'include' });
+        const res = await fetch('/api/interviews', {credentials: 'include'});
         const data = await res.json();
         const tbody = document.getElementById('interviewBody');
 
@@ -129,26 +136,49 @@
         }
 
         tbody.innerHTML = data.map(i => `
-        <tr>
-          <td>${i.name}</td>
-          <td>${i.email}</td>
-          <td>${i.position || '—'}</td>
-          <td>${new Date(i.submittedAt).toLocaleString()}</td>
-          <td>${i.resumePath ? `<a href="${i.resumePath}" class="link" target="_blank">📄 View Résumé</a>` : '—'}</td>
-          <td>${i.coverPath ? `<a href="${i.coverPath}" class="link" target="_blank">📝 View Cover</a>` : '—'}</td>
+<tr class="${i.interviewTime ? 'scheduled' : ''}">
 
+  <td>${i.name}</td>
+  <td>${i.email}</td>
+  <td>${i.position || '—'}</td>
+  <td>${new Date(i.submittedAt).toLocaleString()}</td>
 
-          <td>
-            ${i.interviewTime
-            ? `<span class="status">📅 ${i.interviewTime}<br>🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a></span>`
+  <td>
+    ${i.resumePath
+            ? `
+        <a href="${i.resumePath}" class="link" target="_blank">View</a>
+        ${i.resumeDownloadPath ? ` | <a href="${i.resumeDownloadPath}" class="link" download>Download</a>` : ''}
+      `
+            : '—'}
+  </td>
+
+  <td>
+    ${i.coverPath
+            ? `
+        <a href="${i.coverPath}" class="link" target="_blank">View</a>
+        ${i.coverDownloadPath ? ` | <a href="${i.coverDownloadPath}" class="link" download>Download</a>` : ''}
+      `
+            : '—'}
+  </td>
+
+  <td>
+    ${i.interviewTime
+            ? `<span class="status">📅 ${i.interviewTime}<br>
+     🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a>
+     <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy</button>
+     </span>`
             : '<span class="status">Not scheduled</span>'}
-          </td>
-          <td><button class="action-btn" onclick="schedule('${i._id}')">Schedule</button></td>
-        </tr>
-      `).join('');
+
+  </td>
+
+  <td>
+    <button class="action-btn" onclick="schedule('${i._id}')">Schedule</button>
+  </td>
+</tr>
+`).join('');
     }
 
-    async function schedule(id) {
+        async function schedule(id) {
         const time = prompt('Enter interview date/time (e.g. Nov 10 2025 10:00 AM):');
         if (!time) return;
         const meetLink = prompt('Paste the Google Meet link:');
@@ -167,6 +197,14 @@
     }
 
     loadInterviews();
+    function filterInterviews() {
+        const q = document.getElementById('searchBox').value.toLowerCase();
+        document.querySelectorAll('#interviewBody tr').forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    }
+
 </script>
 </body>
 </html>

@@ -91,4 +91,7 @@ footer {
   margin-top: 10px;
   cursor: pointer;
 }
+tr.scheduled td {
+  background-color: #18392b;
+}
 

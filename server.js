@@ -842,40 +842,6 @@ app.post('/api/contact', async (req, res) => {
 // ─── Job Interview / Resume Upload (Cloudinary Stream Upload) ───
 const streamifier = require('streamifier');
 
-
-// Helper to upload files safely as raw binaries
-function uploadToCloudinary(file, folder) {
-    return new Promise((resolve, reject) => {
-        // extract original filename without path
-        const originalName = file.originalname
-            ? file.originalname.replace(/\.[^/.]+$/, '') // remove extension
-            : 'file';
-
-        const ext = file.originalname?.split('.').pop() || '';
-        const publicId = `${originalName}_${Date.now()}`;
-
-        const options = {
-            folder,
-            resource_type: 'raw',       // ensures binary-safe upload
-            public_id: publicId,        // keep filename
-            use_filename: true,
-            unique_filename: false,
-            type: 'upload',
-            format: ext                 // tells Cloudinary what type to save as
-        };
-
-        const uploadStream = cloudinary.uploader.upload_stream(
-            options,
-            (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-            }
-        );
-
-        streamifier.createReadStream(file.buffer || fs.readFileSync(file.path)).pipe(uploadStream);
-    });
-}
-
 // Upload raw binary safely from memory and keep original name
 function uploadRawToCloudinaryFromBuffer(file, subfolder) {
     return new Promise((resolve, reject) => {
@@ -1087,21 +1053,25 @@ app.get('/api/interviews', requireLogin, isOwner, async (_req, res) => {
     }
 });
 
-// ─── Serve uploaded resume/cover files securely ───
-app.get('/api/interviews/file/:filename', requireLogin, isOwner, (req, res) => {
+// Serve uploaded résumé/cover links (redirect to Cloudinary URLs)
+app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
     try {
-        const filePath = path.join(__dirname, 'uploads', req.params.filename);
-        res.sendFile(filePath, err => {
-            if (err) {
-                console.error('File send error:', err);
-                res.status(404).send('File not found');
-            }
-        });
+        const interview = await Interview.findById(req.params.id);
+        if (!interview) return res.status(404).send('Interview not found');
+
+        const fileType = req.query.type || 'resume';
+        const fileUrl = fileType === 'cover' ? interview.coverPath : interview.resumePath;
+
+        if (!fileUrl) return res.status(404).send('File not found');
+
+        // Redirect browser straight to Cloudinary
+        res.redirect(fileUrl);
     } catch (err) {
-        console.error('Error serving file:', err);
+        console.error('Error redirecting to file:', err);
         res.status(500).send('Server error');
     }
 });
+
 
 // ────── Start Server ──────
 app.listen(PORT, () => {
