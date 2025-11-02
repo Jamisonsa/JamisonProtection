@@ -133,6 +133,16 @@ const Interview = mongoose.model('Interview', new mongoose.Schema({
     zoomLink: String
 }));
 
+const interview = new Interview({
+    name,
+    email,
+    position,
+    resumePath: resumeUrl,
+    resumeDownloadPath: resumeDownload,
+    coverPath: coverUrl,
+    coverDownloadPath: coverDownload
+});
+await interview.save();
 
 // ────── Seed Users ──────
 async function seedUsers() {
@@ -880,25 +890,40 @@ function uploadToCloudinary(file, folder) {
 // Upload raw binary safely from memory and keep original name
 function uploadRawToCloudinaryFromBuffer(file, subfolder) {
     return new Promise((resolve, reject) => {
-        const originalExt = path.extname(file.originalname).replace('.', '').toLowerCase(); // pdf, docx, etc.
-        const baseName = path.basename(file.originalname, path.extname(file.originalname))
+        const ext = path.extname(file.originalname).replace('.', '').toLowerCase();
+        const base = path.basename(file.originalname, path.extname(file.originalname))
             .replace(/[^a-z0-9_\-]+/gi, '_');
-        const publicId = `${subfolder}/${baseName}_${Date.now()}`;
+        const publicId = `${subfolder}/${base}_${Date.now()}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 resource_type: 'raw',
-                public_id,              // Cloudinary stores it as this exact ID
-                use_filename: true,
-                unique_filename: false,
+                public_id,
                 overwrite: true
             },
-            (error, result) => (error ? reject(error) : resolve(result))
+            (err, result) => {
+                if (err) return reject(err);
+
+                // ✅ Build a download link with the real file name
+                const downloadUrl = cloudinary.url(result.public_id, {
+                    resource_type: 'raw',
+                    type: 'upload',
+                    format: ext,
+                    flags: 'attachment',
+                    attachment: file.originalname,
+                    secure: true
+                });
+
+                // Include both view + download URLs in the result
+                result.download_url = downloadUrl;
+                resolve(result);
+            }
         );
 
         uploadStream.end(file.buffer);
     });
 }
+
 
 
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
@@ -916,12 +941,6 @@ function rawDownloadUrl(result, originalName) {
         attachment: originalName
     });
 }
-const downloadUrl = cloudinary.url(result.public_id, {
-    resource_type: 'raw',
-    flags: 'attachment',
-    attachment: file.originalname
-});
-
 
 app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
     try {
@@ -933,18 +952,22 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         const resumeFile = req.files.resume?.[0];
         const coverFile  = req.files.cover?.[0];
 
+// Upload résumé and cover letter
         let resumeUrl = null;
-        let coverUrl  = null;
+        let resumeDownload = null;
+        let coverUrl = null;
+        let coverDownload = null;
 
         if (resumeFile) {
             const up = await uploadRawToCloudinaryFromBuffer(resumeFile, 'jamison_protection/resumes');
-            // Use a download URL that keeps the original filename on save
-            resumeUrl = rawDownloadUrl(up, resumeFile.originalname);
+            resumeUrl = up.secure_url;         // "View" link
+            resumeDownload = up.download_url;  // "Download" link
         }
 
         if (coverFile) {
             const up = await uploadRawToCloudinaryFromBuffer(coverFile, 'jamison_protection/covers');
-            coverUrl = rawDownloadUrl(up, coverFile.originalname);
+            coverUrl = up.secure_url;          // "View" link
+            coverDownload = up.download_url;   // "Download" link
         }
 
         // Save to DB
