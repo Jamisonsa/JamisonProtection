@@ -968,6 +968,16 @@ app.post('/api/interviews/schedule', requireLogin, isOwner, async (req, res) => 
         res.status(500).json({ message: 'Failed to schedule interview.' });
     }
 });
+// ─── Get all interview submissions (for Owner Panel) ───
+app.get('/api/interviews', requireLogin, isOwner, async (_req, res) => {
+    try {
+        const interviews = await Interview.find().sort({ submittedAt: -1 });
+        res.json(interviews);
+    } catch (err) {
+        console.error('Error fetching interviews:', err);
+        res.status(500).json({ message: 'Failed to load interview submissions' });
+    }
+});
 
 
 // ────── Start Server ──────
