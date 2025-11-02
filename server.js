@@ -969,12 +969,6 @@ app.post('/api/interviews/schedule', requireLogin, isOwner, async (req, res) => 
     }
 });
 
-// Clean up uploaded files
-attachments.forEach(file => {
-    fs.unlink(file.path, err => {
-        if (err) console.error('File cleanup error:', err);
-    });
-});
 
 // ────── Start Server ──────
 app.listen(PORT, () => {
