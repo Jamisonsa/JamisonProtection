@@ -134,8 +134,10 @@
           <td>${i.email}</td>
           <td>${i.position || '—'}</td>
           <td>${new Date(i.submittedAt).toLocaleString()}</td>
-          <td>${i.resumePath ? `<a href="/api/interviews/file/${i.resumePath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
-          <td>${i.coverPath ? `<a href="/api/interviews/file/${i.coverPath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
+          <td>${i.resumePath ? `<a href="${i.resumePath}" class="link" target="_blank">📄 View Résumé</a>` : '—'}</td>
+          <td>${i.coverPath ? `<a href="${i.coverPath}" class="link" target="_blank">📝 View Cover</a>` : '—'}</td>
+
+
           <td>
             ${i.interviewTime
             ? `<span class="status">📅 ${i.interviewTime}<br>🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a></span>`
