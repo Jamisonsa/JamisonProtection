@@ -845,41 +845,49 @@ const streamifier = require('streamifier');
 // Upload raw binary safely from memory and keep original name
 function uploadRawToCloudinaryFromBuffer(file, subfolder) {
     return new Promise((resolve, reject) => {
-        const ext = path.extname(file.originalname).replace('.', '').toLowerCase();
         const base = path.basename(file.originalname, path.extname(file.originalname))
             .replace(/[^a-z0-9_\-]+/gi, '_');
-
-        // ✅ Define publicId before using it
         const publicId = `${subfolder}/${base}_${Date.now()}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
-                resource_type: 'raw',
-                public_id: publicId, // use the variable here
-                overwrite: true
+                resource_type: 'raw',       // ✅ always store binary as raw
+                public_id: publicId,
+                overwrite: true,
+                use_filename: true,
+                unique_filename: false
             },
             (err, result) => {
                 if (err) return reject(err);
 
-                // Create a proper download link using Cloudinary's transformation options
+                // ✅ Always use versioned URL to avoid cached mismatches
+                const viewUrl = result.secure_url;
+
+                // ✅ Safe download URL preserving original name, NO format forcing
                 const downloadUrl = cloudinary.url(result.public_id, {
                     resource_type: 'raw',
                     type: 'upload',
-                    format: ext,
+                    version: result.version,
                     flags: 'attachment',
                     attachment: file.originalname,
                     secure: true
                 });
 
-                result.download_url = downloadUrl;
-                resolve(result);
+                resolve({
+                    ...result,
+                    secure_url: viewUrl,
+                    download_url: downloadUrl
+                });
             }
         );
 
-        // Stream the file buffer directly to Cloudinary
-        uploadStream.end(file.buffer);
+        // ✅ Make sure MIME type is preserved in the stream
+        const stream = streamifier.createReadStream(file.buffer);
+        stream.pipe(uploadStream);
     });
 }
+
+
 
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
 function rawDownloadUrl(result, originalName) {
