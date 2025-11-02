@@ -23,7 +23,7 @@ async function notifyUsersOfNewShift(shift) {
 
         const body =
             `New shift posted:\n` +
-            `📅 ${shift.date} at ${shift.time}\n` +
+            `📅 ${shift.date} at ${shift.startTime}\n` +
             `📍 ${shift.location}\n` +
             (shift.notes ? `📝 ${shift.notes}\n` : '') +
             `— Jamison Protection`;
@@ -45,6 +45,16 @@ async function notifyUsersOfNewShift(shift) {
         console.error('SMS notify error:', err?.message || err);
     }
 }
+const nodemailer = require('nodemailer');
+
+// ────── NodeMailer Config ──────
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.CONTACT_EMAIL_USER,   // your Gmail or domain email
+        pass: process.env.CONTACT_EMAIL_PASS    // app password (not your normal password)
+    }
+});
 
 const express = require('express');
 const session = require('express-session');
@@ -99,6 +109,16 @@ const SecurityLog = mongoose.model('SecurityLog', new mongoose.Schema({
     initials: String,
     submittedBy: String,
     createdAt: { type: Date, default: Date.now }
+}));
+const Interview = mongoose.model('Interview', new mongoose.Schema({
+    name: String,
+    email: String,
+    position: String,
+    resumePath: String,
+    coverPath: String,
+    submittedAt: { type: Date, default: Date.now },
+    interviewTime: String,
+    zoomLink: String
 }));
 
 
@@ -276,6 +296,33 @@ app.post('/api/admin/toggle-sms', requireLogin, isOwner, async (req, res) => {
     }
 });
 
+// ─── Test SMS Route ───
+app.post('/api/admin/test-sms', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) return res.status(400).json({ message: 'Phone number is required.' });
+
+        if (!twilioClient) {
+            return res.status(500).json({ message: 'Twilio is not configured on the server.' });
+        }
+
+        const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
+            ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID }
+            : { from: process.env.TWILIO_FROM };
+
+        await twilioClient.messages.create({
+            ...fromConfig,
+            to: phone,
+            body: `✅ Test SMS from Jamison Protection — Twilio is configured correctly!`
+        });
+
+        console.log(`📤 Test SMS sent to ${phone}`);
+        res.json({ message: `Test SMS successfully sent to ${phone}` });
+    } catch (err) {
+        console.error('Error sending test SMS:', err.message || err);
+        res.status(500).json({ message: 'Failed to send test SMS.' });
+    }
+});
 
 app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
@@ -350,6 +397,30 @@ app.post('/logout', (req, res) => {
   req.session.destroy();
   res.json({ message: 'Logged out' });
 });
+// ─── Worker Self Password Reset ───
+app.post('/api/change-password', requireLogin, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ message: 'Both old and new passwords are required.' });
+        }
+
+        const user = await User.findOne({ username: req.session.user.username });
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        const isMatch = await user.comparePassword(oldPassword);
+        if (!isMatch) return res.status(401).json({ message: 'Old password is incorrect.' });
+
+        user.password = newPassword; // pre-save hook will hash automatically
+        await user.save();
+
+        res.json({ message: 'Password updated successfully.' });
+    } catch (err) {
+        console.error('Change password error:', err);
+        res.status(500).json({ message: 'Server error changing password.' });
+    }
+});
+
 // ─── Submit new security log ───
 app.post('/api/security-logs', requireLogin, async (req, res) => {
     try {
@@ -424,7 +495,7 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     });
     await shift.save();
 
-    console.log(`✅ New shift posted by ${req.session.user}: ${date} ${time} at ${location}`);
+    console.log(`✅ New shift posted by ${req.session.user}: ${date} ${startTime} at ${location}`);
 
     notifyUsersOfNewShift(shift).catch(() => {});
     res.json({ message: 'Shift posted' });
@@ -679,12 +750,12 @@ async function checkDroppedShifts() {
         });
 
         for (const shift of dropped) {
-            const startAt = toDateTime(shift.date, shift.time);
+            const startAt = toDateTime(shift.date, shift.startTime);
             const hoursUntil = (startAt - now) / 36e5;
 
             // alert when within 24 hours but still in the future
             if (hoursUntil <= 24 && hoursUntil > 0) {
-                console.log(`🚨 24h alert for shift ${shift._id} at ${shift.location} (${shift.date} ${shift.time})`);
+                console.log(`🚨 24h alert for shift ${shift._id} at ${shift.location} (${shift.date} ${shift.startTime})`);
 
                 if (twilioClient) {
                     const owners = await User.find({
@@ -695,7 +766,7 @@ async function checkDroppedShifts() {
 
                     const body =
                         `⚠️ Urgent Shift: ${shift.location}\n` +
-                        `${shift.date} ${shift.time}\n` +
+                        `${shift.date} ${shift.startTime}\n` +
                         `Dropped by ${shift.droppedBy}. Needs coverage within 24h.`;
 
                     const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
@@ -717,12 +788,185 @@ async function checkDroppedShifts() {
     }
 }
 
-// run every 30 minutes
-setInterval(checkDroppedShifts, 30 * 60 * 1000);
-
 
 // Run every 30 minutes
 setInterval(checkDroppedShifts, 30 * 60 * 1000);
+// ─── Contact Form Route ───
+app.post('/api/contact', async (req, res) => {
+    try {
+        const { name, email, message } = req.body;
+        if (!name || !email || !message) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
+
+        // Email to business
+        const mailOptions = {
+            from: `"Jamison Protection Website" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: 'jamisonprotectionllc@gmail.com',
+            subject: `📬 New Contact Form Message from ${name}`,
+            text: `You received a new message from ${name} (${email}):\n\n${message}`,
+            replyTo: email
+        };
+
+        // Send to business
+        await transporter.sendMail(mailOptions);
+        console.log(`📨 Contact message sent from ${name} (${email})`);
+
+        // ✅ Send confirmation to sender
+        await transporter.sendMail({
+            from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
+            cc: 'jamisonprotectionllc@gmail.com',
+            to: email,
+            subject: "We received your message",
+            text: `Hi ${name},\n\nThank you for contacting Jamison Protection. We’ve received your message and will respond shortly.\n\n— Jamison Protection Team`
+        });
+
+        // Send final response
+        res.json({ message: 'Your message has been sent successfully!' });
+    } catch (err) {
+        console.error('Error sending contact form email:', err);
+        res.status(500).json({ message: 'Failed to send message. Please try again later.' });
+    }
+});
+// ─── Job Interview / Resume Upload ───
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' }); // temporary upload folder
+
+app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
+    try {
+        const { name, email, position } = req.body;
+        if (!name || !email || !req.files?.resume) {
+            return res.status(400).json({ message: 'Name, email, and résumé are required.' });
+        }
+
+        const attachments = [];
+        if (req.files.resume?.[0]) {
+            attachments.push({ filename: req.files.resume[0].originalname, path: req.files.resume[0].path });
+        }
+        if (req.files.cover?.[0]) {
+            attachments.push({ filename: req.files.cover[0].originalname, path: req.files.cover[0].path });
+        }
+
+        // Save to DB first
+        const interview = new Interview({
+            name,
+            email,
+            position,
+            resumePath: req.files.resume?.[0]?.path,
+            coverPath: req.files.cover?.[0]?.path || null
+        });
+        await interview.save();
+
+        // Email to you
+        await transporter.sendMail({
+            from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: 'jamisonprotectionllc@gmail.com',
+            subject: `📄 New Interview Request from ${name}`,
+            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nAttached: résumé and cover letter (if provided).`,
+            attachments
+        });
+
+        // Confirmation to applicant
+        await transporter.sendMail({
+            from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: email,
+            subject: 'We received your application',
+            text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We have received your résumé and will review your application soon.\n\n— Jamison Protection Team`
+        });
+
+        res.json({ message: 'Your application has been sent successfully!' });
+    } catch (err) {
+        console.error('Error sending interview email:', err);
+        res.status(500).json({ message: 'Failed to send application. Please try again later.' });
+    }
+});
+function generateICS(interview) {
+    const { interviewTime, zoomLink, name, email } = interview;
+
+    const start = new Date(interviewTime);
+    const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min duration
+
+    const formatDate = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+    return `
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Jamison Protection//Interview Scheduler//EN
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:${Date.now()}@jamisonprotection.com
+SUMMARY:Interview with Jamison Protection
+DTSTART:${formatDate(start)}
+DTEND:${formatDate(end)}
+LOCATION:Google Meet
+DESCRIPTION:Interview with Jamison Protection\\nJoin Link: ${zoomLink}
+ORGANIZER;CN=Jamison Protection:mailto:${process.env.CONTACT_EMAIL_USER}
+ATTENDEE;CN=${name};RSVP=TRUE:mailto:${email}
+END:VEVENT
+END:VCALENDAR
+  `.trim();
+}
+
+// ─── Schedule Interview (manual Google Meet link) ───
+app.post('/api/interviews/schedule', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { id, time, meetLink } = req.body;
+        const interview = await Interview.findById(id);
+        if (!interview) return res.status(404).json({ message: 'Interview not found.' });
+
+        interview.interviewTime = time;
+        interview.zoomLink = meetLink; // reusing field name
+        await interview.save();
+
+        // Send a clean HTML email w/ button + calendar invite
+        const icsContent = generateICS(interview);
+
+        await transporter.sendMail({
+            from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: interview.email,
+            cc: 'jamisonprotectionllc@gmail.com',
+            subject: 'Interview Scheduled with Jamison Protection',
+            html: `
+    <p>Hi <strong>${interview.name}</strong>,</p>
+    <p>Your interview has been scheduled for <strong>${time}</strong>.</p>
+    <p>
+      <a href="${meetLink}" target="_blank" style="
+        background-color:#e63946;
+        color:white;
+        padding:10px 15px;
+        border-radius:6px;
+        text-decoration:none;
+        font-weight:bold;
+      ">
+        Join Google Meet Interview
+      </a>
+    </p>
+    <p>We look forward to speaking with you.<br><br>— Jamison Protection Team</p>
+  `,
+            attachments: [
+                {
+                    filename: 'JamisonProtection-Interview.ics',
+                    content: icsContent,
+                    contentType: 'text/calendar'
+                }
+            ]
+        });
+
+
+        res.json({ message: 'Interview scheduled and Meet link sent successfully.' });
+    } catch (err) {
+        console.error('Error scheduling interview:', err);
+        res.status(500).json({ message: 'Failed to schedule interview.' });
+    }
+});
+
+// Clean up uploaded files
+attachments.forEach(file => {
+    fs.unlink(file.path, err => {
+        if (err) console.error('File cleanup error:', err);
+    });
+});
 
 // ────── Start Server ──────
 app.listen(PORT, () => {

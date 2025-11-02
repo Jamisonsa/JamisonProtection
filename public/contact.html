@@ -27,19 +27,83 @@
   <p><strong>📞 Phone:</strong> (667) 231‑9552</p>
   <p><strong>📍 Location:</strong> Serving all of Maryland</p>
 
-  <form style="margin-top: 30px;">
-    <label for="name">Your Name</label><br>
-    <input type="text" id="name" required><br><br>
+      <form id="contactForm" style="margin-top:30px;">
+          <h3>General Inquiry</h3>
+          <label>Your Name</label><br>
+          <input type="text" id="name" required><br><br>
 
-    <label for="email">Your Email</label><br>
-    <input type="email" id="email" required><br><br>
+          <label>Your Email</label><br>
+          <input type="email" id="email" required><br><br>
 
-    <label for="message">Message</label><br>
-    <textarea id="message" rows="5" required></textarea><br><br>
+          <label>Message</label><br>
+          <textarea id="message" rows="5" required></textarea><br><br>
 
-    <button type="submit">Send Message</button>
-  </form>
-</main>
+          <button type="submit">Send Message</button>
+      </form>
+
+      <hr style="margin:40px 0;">
+
+      <form id="interviewForm" enctype="multipart/form-data">
+          <h3>Request an Interview / Job Inquiry</h3>
+          <label>Your Name</label><br>
+          <input type="text" name="name" required><br><br>
+
+          <label>Your Email</label><br>
+          <input type="email" name="email" required><br><br>
+
+          <label>Position (optional)</label><br>
+          <input type="text" name="position" placeholder="e.g. Security Officer"><br><br>
+
+          <label>Résumé (PDF/DOCX)</label><br>
+          <input type="file" name="resume" accept=".pdf,.doc,.docx" required><br><br>
+
+          <label>Cover Letter (optional)</label><br>
+          <input type="file" name="cover" accept=".pdf,.doc,.docx"><br><br>
+
+          <button type="submit">Submit Application</button>
+      </form>
+
+      <p id="responseMsg" style="margin-top:15px;"></p>
+
+      <script>
+          /* General contact message */
+          document.getElementById('contactForm').addEventListener('submit', async e => {
+              e.preventDefault();
+              const name = document.getElementById('name').value.trim();
+              const email = document.getElementById('email').value.trim();
+              const message = document.getElementById('message').value.trim();
+              const resMsg = document.getElementById('responseMsg');
+              resMsg.textContent = 'Sending...';
+
+              const res = await fetch('/api/contact', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name, email, message })
+              });
+              const data = await res.json();
+              resMsg.style.color = res.ok ? 'limegreen' : 'red';
+              resMsg.textContent = data.message;
+              if (res.ok) e.target.reset();
+          });
+
+          /* Interview form upload */
+          document.getElementById('interviewForm').addEventListener('submit', async e => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const resMsg = document.getElementById('responseMsg');
+              resMsg.textContent = 'Uploading...';
+
+              const res = await fetch('/api/interview', {
+                  method: 'POST',
+                  body: formData
+              });
+              const data = await res.json();
+              resMsg.style.color = res.ok ? 'limegreen' : 'red';
+              resMsg.textContent = data.message;
+              if (res.ok) e.target.reset();
+          });
+      </script>
+      <main>
 
   <footer>
     <p>&copy; 2025 Jamison Protection. All rights reserved.</p>

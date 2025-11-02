@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Interview Submissions | Jamison Protection</title>
+    <style>
+        body {
+            background: #121212;
+            color: #f5f5f5;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: #e63946;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        header button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        main {
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+
+        th {
+            background: #222;
+            color: #f2c744;
+        }
+
+        tr:hover {
+            background: #2b2b2b;
+        }
+
+        .action-btn {
+            background: #e63946;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .link {
+            color: #f2c744;
+            text-decoration: none;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .status {
+            font-size: 13px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Interview Submissions</h1>
+    <button onclick="goBack()">⬅ Back to Owner Panel</button>
+</header>
+
+<main>
+    <table id="interviewTable">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Position</th>
+            <th>Submitted</th>
+            <th>Résumé</th>
+            <th>Cover Letter</th>
+            <th>Interview</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="interviewBody">
+        <tr><td colspan="8">Loading interviews...</td></tr>
+        </tbody>
+    </table>
+</main>
+
+<script>
+    function goBack() {
+        window.location.href = 'owner-panel.html';
+    }
+
+    async function loadInterviews() {
+        const res = await fetch('/api/interviews', { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('interviewBody');
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No interview submissions yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(i => `
+        <tr>
+          <td>${i.name}</td>
+          <td>${i.email}</td>
+          <td>${i.position || '—'}</td>
+          <td>${new Date(i.submittedAt).toLocaleString()}</td>
+          <td>${i.resumePath ? `<a href="/api/interviews/file/${i.resumePath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
+          <td>${i.coverPath ? `<a href="/api/interviews/file/${i.coverPath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
+          <td>
+            ${i.interviewTime
+            ? `<span class="status">📅 ${i.interviewTime}<br>🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a></span>`
+            : '<span class="status">Not scheduled</span>'}
+          </td>
+          <td><button class="action-btn" onclick="schedule('${i._id}')">Schedule</button></td>
+        </tr>
+      `).join('');
+    }
+
+    async function schedule(id) {
+        const time = prompt('Enter interview date/time (e.g. Nov 10 2025 10:00 AM):');
+        if (!time) return;
+        const meetLink = prompt('Paste the Google Meet link:');
+        if (!meetLink) return;
+
+        const res = await fetch('/api/interviews/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ id, time, meetLink })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        loadInterviews();
+    }
+
+    loadInterviews();
+</script>
+</body>
+</html>

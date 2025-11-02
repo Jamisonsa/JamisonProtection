@@ -1,805 +1,170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Owner Panel | Jamison Protection</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #121212;
-      color: #f0f0f0;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #1c1c1c;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .logout-btn {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: #444;
-      color: white;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    main {
-      max-width: 900px;
-      margin: auto;
-      padding: 30px;
-    }
-    form {
-      margin-bottom: 30px;
-      background: #1f1f1f;
-      padding: 20px;
-      border-left: 5px solid #e63946;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    }
-    input, textarea {
-      background: #2a2a2a;
-      color: white;
-      border: none;
-      padding: 10px;
-      margin: 8px 0;
-      width: 100%;
-    }
-    button {
-      background: #e63946;
-      color: white;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .shift {
-      background: #1f1f1f;
-      margin: 15px 0;
-      padding: 15px;
-      border-left: 5px solid #1c1c1c;
-    }/* Delete button style */
-    .shift button {
-        background: #e63946;
-        border: none;
-        padding: 6px 10px;
-        color: white;
-        border-radius: 4px;
-        margin-top: 6px;
-        cursor: pointer;
-    }
-    .shift button:hover {
-        background: #c5303d;
-    }
-    .delete-btn {
-        background: #e63946;
-        border: none;
-        color: white;
-        font-size: 18px;
-        font-weight: bold;
-        padding: 12px 20px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.25s ease-in-out;
-        min-width: 120px;
-        text-align: center;
-    }
-    .delete-btn:hover {
-        background: #c5303d;
-        transform: scale(1.07);
-    }
-    button[onclick="deleteSelectedShifts()"] {
-        background: #e63946;
-        color: white;
-        font-weight: bold;
-        padding: 10px 16px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    button[onclick="deleteSelectedShifts()"]:hover {
-        background: #c5303d;
-        transform: scale(1.05);
-    }
-    /* ───── Toolbar for bulk delete ───── */
-    #toolbar {
-        position: sticky;
-        top: 0;
-        z-index: 999;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #252525;
-        padding: 10px 16px;
-        border-bottom: 2px solid #e63946;
-        border-radius: 6px;
-        margin-bottom: 10px;
-        opacity: 1;
-        transition: opacity 0.3s ease, transform 0.3s ease;
-    }
+    <meta charset="UTF-8" />
+    <title>Interview Submissions | Jamison Protection</title>
+    <style>
+        body {
+            background: #121212;
+            color: #f5f5f5;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
 
-    #toolbar.hidden {
-        opacity: 0;
-        transform: translateY(-100%);
-        pointer-events: none;
-    }
+        header {
+            background: #e63946;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-    #toolbar button {
-        background: #e63946;
-        color: white;
-        font-weight: bold;
-        padding: 10px 16px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        transition: 0.2s;
-    }
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
 
-    #toolbar button:hover {
-        background: #c5303d;
-        transform: scale(1.05);
-    }
+        header button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
 
-    #selectedCount {
-        font-size: 15px;
-        color: #f2f2f2;
-    }
-    #securityLogFilter input, #securityLogFilter button {
-        margin: 5px;
-        padding: 8px;
-        border-radius: 5px;
-        border: none;
-    }
-    #securityLogFilter button {
-        background: #e63946;
-        color: white;
-        cursor: pointer;
-        font-weight: bold;
-        transition: 0.2s;
-    }
-    #securityLogFilter button:hover {
-        background: #c5303d;
-    }
-    nav {
-        margin-bottom: 15px;
-    }
-    nav button {
-        background: #444;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        margin-right: 5px;
-    }
-    nav button:hover {
-        background: #666;
-    }
-    .tab {
-        display: none;
-    }
-    .tab.active {
-        display: block;
-    }
-    table, th, td {
-        border: 1px solid #555;
-        padding: 8px;
-        text-align: center;
-    }
+        main {
+            padding: 20px;
+        }
 
-    .payroll-card {
-        background: #1f1f1f;
-        border-left: 5px solid #4CAF50;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 20px;
-    }
-    .payroll-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-    }
-    .payroll-table th, .payroll-table td {
-        border: 1px solid #555;
-        padding: 8px;
-        text-align: center;
-    }
-    .payroll-table th {
-        background: #333;
-        color: white;
-    }
-    .total-row {
-        background: #2e2e2e;
-        font-weight: bold;
-    }
-    #submittedHoursContainer {
-        transition: all 0.3s ease-in-out;
-        overflow: hidden;
-        background: #1f1f1f;
-        padding: 15px;
-        border-radius: 8px;
-        margin-top: 15px;
-    }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
 
-  </style>
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+
+        th {
+            background: #222;
+            color: #f2c744;
+        }
+
+        tr:hover {
+            background: #2b2b2b;
+        }
+
+        .action-btn {
+            background: #e63946;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .link {
+            color: #f2c744;
+            text-decoration: none;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .status {
+            font-size: 13px;
+            color: #aaa;
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <h1>Owner Panel</h1>
-      <nav>
-          <button onclick="showTab('securityLogs')">Security Logs</button>
-          <button onclick="showTab('payroll')">Payroll</button>
-      </nav>
-      <button class="logout-btn" onclick="logout()">Logout</button>
-    <button class="switch-btn" onclick="switchToWorker()">Switch to Worker View</button>
-    <button class="admin-btn" onclick="goToAdmin()">Open Admin Panel</button>
-      <button onclick="viewSubmittedHours()">View Submitted Hours</button>
-  </header>
+<header>
+    <h1>Interview Submissions</h1>
+    <button onclick="goBack()">⬅ Back to Owner Panel</button>
+</header>
 
-  <main>
-      <h2>Create New Shift</h2>
-      <form id="shiftForm" onsubmit="postShift(event)">
-          <label>Date:</label>
-          <input type="date" id="shiftDate" required><br><br>
+<main>
+    <table id="interviewTable">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Position</th>
+            <th>Submitted</th>
+            <th>Résumé</th>
+            <th>Cover Letter</th>
+            <th>Interview</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="interviewBody">
+        <tr><td colspan="8" style="text-align:center;">Loading interviews...</td></tr>
+        </tbody>
+    </table>
+</main>
 
-          <label>Start Time:</label>
-          <input type="time" id="shiftStart" required><br><br>
-
-          <label>Expected End Time:</label>
-          <input type="text" id="shiftEnd" placeholder="e.g. 5:00 PM or Until Dismissed" required><br><br>
-
-          <label>Location:</label>
-          <select id="shiftLocation" required>
-              <option value="John Carroll School">John Carroll School</option>
-          </select><br><br>
-
-          <label>Work Position:</label>
-          <input type="text" id="shiftPosition" placeholder="e.g. Front Desk" required><br><br>
-
-          <label>Notes:</label>
-          <textarea id="shiftNotes" placeholder="Additional notes..."></textarea><br><br>
-
-          <button type="submit" class="submit-btn">Post Shift</button>
-      </form>
-
-      <h2>All Shifts</h2>
-
-      <div style="margin-bottom: 15px;">
-          <input type="text" id="filterName" placeholder="Filter by worker name..." style="padding:6px; width:200px;">
-          <input type="date" id="filterDate" style="padding:6px;">
-          <button onclick="loadShifts()">Apply Filter</button>
-          <button onclick="clearFilters()">Clear</button>
-      </div>
-
-      <div id="shiftList"></div>
-      <hr>
-
-      <div id="submittedHoursContainer" style="display:none;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3>Submitted Hours</h3>
-              <button onclick="closeSubmittedHours()" style="
-      background:#e63946;
-      color:white;
-      border:none;
-      padding:6px 12px;
-      border-radius:5px;
-      cursor:pointer;
-      font-weight:bold;
-    ">Close ✖</button>
-          </div>
-          <div id="submittedHoursContent">
-              <p>Loading...</p>
-          </div>
-      </div>
-
-      <hr>
-      <div id="payrollTab" class="tab" style="display:none;">
-          <h2>Weekly Payroll Summary</h2>
-
-          <div style="margin-bottom:15px;">
-              <label>Start Date:</label>
-              <input type="date" id="payrollStart">
-              <label>End Date:</label>
-              <input type="date" id="payrollEnd">
-              <button onclick="loadPayroll()">Generate Payroll</button>
-          </div>
-
-          <div id="payrollContainer">
-              <p>Enter a date range and click "Generate Payroll".</p>
-          </div>
-      </div>
-
-      <h2>Security Log Viewer</h2>
-
-      <div id="securityLogFilter" style="margin-bottom: 15px;">
-          <label>Date:</label>
-          <input type="date" id="filterDateLog">
-
-          <label>Worker Initials:</label>
-          <input type="text" id="filterInitialsLog" placeholder="e.g. FJ">
-
-          <button onclick="filterSecurityLogs()">Apply Filter</button>
-          <button onclick="clearSecurityFilters()">Clear</button>
-          <button onclick="exportSecurityLogs()">⬇ Export CSV</button>
-      </div>
-
-      <div id="securityLogContainer">
-          <p>Loading logs...</p>
-      </div>
-      <div id="shiftsTab" class="tab active">
-          <!-- existing shift management UI -->
-      </div>
-
-      <div id="securityLogsTab" class="tab" style="display:none;">
-          <!-- existing security log viewer -->
-      </div>
-
-      <div id="payrollTab" class="tab" style="display:none;">
-          <h2>Payroll Summary</h2>
-
-          <div>
-              <label>Start Date:</label>
-              <input type="date" id="payrollStart">
-              <label>End Date:</label>
-              <input type="date" id="payrollEnd">
-              <button onclick="loadPayroll()">Generate Payroll</button>
-          </div>
-
-          <table id="payrollTable" style="margin-top:15px; width:100%; border-collapse:collapse;">
-              <thead>
-              <tr style="background:#333; color:white;">
-                  <th>Worker</th>
-                  <th>Total Hours</th>
-                  <th>Rate ($/hr)</th>
-                  <th>Total Pay ($)</th>
-              </tr>
-              </thead>
-              <tbody id="payrollBody">
-              <tr><td colspan="4" style="text-align:center;">Enter a date range and click Generate</td></tr>
-              </tbody>
-          </table>
-      </div>
-
-  </main>
-
-  <script>
-      function showTab(tabName) {
-          document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
-          document.getElementById(tabName + 'Tab').style.display = 'block';
-      }
-
-      async function loadShifts() {
-          const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
-          const date = document.getElementById('filterDate')?.value || '';
-
-          const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
-          if (res.status === 401) return location.href = 'login.html';
-
-          const shifts = await res.json();
-
-          const filtered = shifts.filter(s => {
-              const matchName = !name || (s.claimedBy && s.claimedBy.toLowerCase().includes(name));
-              const matchDate = !date || s.date === date;
-              return matchName && matchDate;
-          });
-
-          const container = document.getElementById('shiftList');
-          if (filtered.length === 0) {
-              container.innerHTML = '<p>No shifts found.</p>';
-              return;
-          }
-
-          container.innerHTML = `
-  <div id="toolbar" class="hidden">
-  <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
-  <span id="selectedCount">0 selected</span>
-</div>
-  <div id="shiftContainer">
-    ${filtered.map(s => `
-   <div class="shift" style="display:flex; justify-content:space-between; align-items:center; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
-    <div>
-      <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
-      Location: ${s.location || 'Unknown'}<br>
-      Position: ${s.position || 'Unassigned'}<br>
-      Notes: ${s.notes || 'None'}<br>
-      Claimed by: ${s.claimedBy || 'Not claimed yet'}
-    </div>
-    <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
-  </div>
-    `).join('')}
-  </div>
-`;
-
-      }
-      async function filterLogs() {
-          const date = document.getElementById('filterDate').value;
-          try {
-              const res = await fetch('/api/logs-by-date?date=' + date, { credentials: 'include' });
-              if (!res.ok) throw new Error('HTTP ' + res.status);
-              const logs = await res.json();
-              const tbody = document.getElementById('logBody');
-              tbody.innerHTML = '';
-
-              logs.forEach(log => {
-                  const row = document.createElement('tr');
-                  row.innerHTML = `
-        <td>${log.username}</td>
-        <td>${log.date}</td>
-        <td>${log.hours}</td>
-        <td>${log.description || ''}</td>`;
-                  tbody.appendChild(row);
-              });
-
-              if (logs.length === 0) tbody.innerHTML = '<tr><td colspan="4">No logs found.</td></tr>';
-          } catch (err) {
-              console.error('Failed to load logs:', err);
-              alert('Failed to load logs.');
-          }
-      }
-      async function viewSubmittedHours() {
-          const container = document.getElementById('submittedHoursContainer');
-          const content = document.getElementById('submittedHoursContent');
-
-          // Show the container
-          container.style.display = 'block';
-          content.innerHTML = '<p>Loading submitted logs...</p>';
-
-          try {
-              const res = await fetch('/api/view-logs', { credentials: 'include' });
-              if (!res.ok) {
-                  content.innerHTML = '<p>Failed to load logs.</p>';
-                  return;
-              }
-              const data = await res.json();
-
-              if (!Object.keys(data).length) {
-                  content.innerHTML = '<p>No submitted hours found.</p>';
-                  return;
-              }
-
-              content.innerHTML = Object.entries(data).map(([user, logs]) => `
-      <div class="payroll-card">
-        <h3>${user}</h3>
-        <table class="payroll-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Location</th>
-              <th>Position</th>
-              <th>Hours</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${logs.map(l => `
-              <tr>
-                <td>${l.date}</td>
-                <td>${l.startTime}</td>
-                <td>${l.endTime}</td>
-                <td>${l.location}</td>
-                <td>${l.position}</td>
-                <td>${l.hours}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `).join('');
-          } catch (err) {
-              console.error('Error fetching logs:', err);
-              content.innerHTML = '<p>Error loading logs.</p>';
-          }
-      }
-      function closeSubmittedHours() {
-          const container = document.getElementById('submittedHoursContainer');
-          container.style.display = 'none';
-      }
-
-
-
-      function clearFilters() {
-          document.getElementById('filterName').value = '';
-          document.getElementById('filterDate').value = '';
-          loadShifts();
-      }
-
-        async function loadDroppedShifts() {
-        const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
-        const all = await res.json();
-        const dropped = all.filter(s => s.status === 'dropped' && !s.claimedBy);
-        const container = document.getElementById('droppedShiftList');
-
-        if (dropped.length === 0) {
-        container.innerHTML = '<p>No dropped shifts at the moment.</p>';
-        return;
+<script>
+    function goBack() {
+        window.location.href = 'owner-panel.html';
     }
 
-        container.innerHTML = dropped.map(s => `
-    <div class="shift" style="border:2px solid red; margin-bottom:10px; padding:10px;">
-      <strong>${s.date} at ${s.time}</strong><br>
-      Location: ${s.location}<br>
-      Dropped by: ${s.droppedBy || 'Unknown'}<br>
-      <button onclick="repostShift('${s._id}')">Repost as Available</button>
-    </div>
-  `).join('');
+    async function loadInterviews() {
+        const res = await fetch('/api/interviews', { credentials: 'include' });
+        const data = await res.json();
+        const tbody = document.getElementById('interviewBody');
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No interview submissions yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(i => `
+        <tr>
+          <td>${i.name}</td>
+          <td>${i.email}</td>
+          <td>${i.position || '—'}</td>
+          <td>${new Date(i.submittedAt).toLocaleString()}</td>
+          <td>${i.resumePath ? `<a href="/api/interviews/file/${i.resumePath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
+          <td>${i.coverPath ? `<a href="/api/interviews/file/${i.coverPath.split('\\\\').pop().split('/').pop()}" class="link" target="_blank">Open</a>` : '—'}</td>
+          <td>
+            ${i.interviewTime
+            ? `<span class="status">📅 ${i.interviewTime}<br>🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a></span>`
+            : '<span class="status">Not scheduled</span>'}
+          </td>
+          <td><button class="action-btn" onclick="schedule('${i._id}')">Schedule</button></td>
+        </tr>
+      `).join('');
     }
 
-        async function repostShift(id) {
-        await fetch('/api/repost-shift', {
+    async function schedule(id) {
+        const time = prompt('Enter interview date/time (e.g. Nov 10 2025 10:00 AM):');
+        if (!time) return;
+        const meetLink = prompt('Paste the Google Meet link:');
+        if (!meetLink) return;
+
+        const res = await fetch('/api/interviews/schedule', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ shiftId: id })
+            body: JSON.stringify({ id, time, meetLink })
         });
-        alert('Shift reposted as available.');
-        loadDroppedShifts();
+
+        const data = await res.json();
+        alert(data.message);
+        loadInterviews();
     }
 
-        // Load dropped shifts when panel loads
-        loadDroppedShifts();
-
-
-    function loadLogs() {
-      const selectedDate = document.getElementById('filterDate')?.value;
-      const url = selectedDate ? `/api/logs-by-date?date=${selectedDate}` : '/api/view-logs';
-
-      fetch(url, { credentials: 'include' })
-        .then(res => res.json())
-        .then(logs => {
-          const container = document.getElementById('logContainer');
-          if (logs.length === 0) {
-            container.innerHTML = '<p>No logs found.</p>';
-            return;
-          }
-
-          let html = `
-            <h3>Submitted Hours</h3>
-            <input type="date" id="filterDate" onchange="loadLogs()" style="margin-bottom: 10px;" />
-            <table border="1" cellpadding="8" cellspacing="0" style="margin-top: 10px; width: 100%;">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Date</th>
-                  <th>Hours</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-          `;
-
-          logs.forEach(log => {
-            html += `<tr>
-              <td>${log.username}</td>
-              <td>${log.date}</td>
-              <td>${log.hours}</td>
-              <td>${log.description || ''}</td>
-            </tr>`;
-          });
-
-          html += '</tbody></table>';
-          container.innerHTML = html;
-        })
-        .catch(err => {
-          console.error(err);
-          alert('Failed to load logs');
-        });
-    }
-
-      async function postShift(event) {
-          event.preventDefault();
-
-          const shift = {
-              date: document.getElementById('shiftDate').value,
-              startTime: document.getElementById('shiftStart').value,
-              expectedEnd: document.getElementById('shiftEnd').value,
-              location: document.getElementById('shiftLocation').value,
-              position: document.getElementById('shiftPosition').value,
-              notes: document.getElementById('shiftNotes').value
-          };
-
-          const res = await fetch('/api/shifts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify(shift)
-          });
-
-          const data = await res.json();
-          alert(data.message);
-          document.getElementById('shiftForm').reset();
-          loadShifts();
-      }
-      async function loadPayroll() {
-          const startDate = document.getElementById('payrollStart').value;
-          const endDate = document.getElementById('payrollEnd').value;
-
-          if (!startDate || !endDate) {
-              alert('Please select a start and end date.');
-              return;
-          }
-
-          const res = await fetch(`/api/payroll?startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
-          const data = await res.json();
-          const container = document.getElementById('payrollContainer');
-
-          if (!data.length) {
-              container.innerHTML = '<p>No logged hours found for that date range.</p>';
-              return;
-          }
-
-          container.innerHTML = data.map(worker => `
-    <div class="payroll-card">
-      <h3>${worker.user}</h3>
-      <p><strong>Rate:</strong> $${worker.rate}/hr</p>
-
-      <table class="payroll-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Location</th>
-            <th>Position</th>
-            <th>Hours</th>
-            <th>Pay ($)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${worker.entries.map(entry => `
-            <tr>
-              <td>${entry.date}</td>
-              <td>${entry.start}</td>
-              <td>${entry.end}</td>
-              <td>${entry.location}</td>
-              <td>${entry.position}</td>
-              <td>${entry.hours}</td>
-              <td>${entry.pay}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td colspan="5"><strong>Total</strong></td>
-            <td><strong>${worker.totalHours}</strong></td>
-            <td><strong>$${worker.totalPay}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  `).join('');
-      }
-
-
-      function logout() {
-      fetch('/logout', {
-        method: 'POST',
-        credentials: 'include'
-      }).then(() => location.href = 'login.html');
-    }
-
-    function switchToWorker() {
-        fetch('/api/switch-to-worker', {
-            method: 'POST',
-            credentials: 'include'
-        })
-            .then(res => res.ok ? (location.href = 'worker-dashboard.html') : alert('Only owner can switch.'))
-            .catch(err => alert('Switch failed: ' + err.message));
-    }
-      async function deleteShift(id) {
-          if (!confirm('Are you sure you want to delete this shift?')) return;
-          const res = await fetch(`/api/delete-shift/${id}`, {
-              method: 'DELETE',
-              credentials: 'include'
-          });
-          const data = await res.json();
-          alert(data.message);
-          loadShifts();
-      }
-
-      async function deleteSelectedShifts() {
-          const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
-          if (checkboxes.length === 0) return alert('No shifts selected.');
-
-          if (!confirm(`Delete ${checkboxes.length} selected shifts?`)) return;
-
-          const ids = Array.from(checkboxes).map(cb => cb.value);
-          const res = await fetch('/api/delete-multiple-shifts', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ ids })
-          });
-
-          const data = await res.json();
-          alert(data.message);
-          loadShifts();
-      }
-      function updateSelectedCount() {
-          const checkboxes = document.querySelectorAll('.shift-checkbox');
-          const checked = document.querySelectorAll('.shift-checkbox:checked').length;
-          const counter = document.getElementById('selectedCount');
-          const toolbar = document.getElementById('toolbar');
-
-          if (counter) counter.textContent = `${checked} selected`;
-
-          // Show or hide toolbar dynamically
-          if (toolbar) {
-              if (checked > 0) {
-                  toolbar.classList.remove('hidden');
-              } else {
-                  toolbar.classList.add('hidden');
-              }
-          }
-      }
-      async function loadSecurityLogs(date = '', initials = '') {
-          try {
-              let url = '/api/security-logs';
-              const params = [];
-              if (date) params.push(`date=${encodeURIComponent(date)}`);
-              if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
-              if (params.length) url += '?' + params.join('&');
-
-              const res = await fetch(url, { credentials: 'include' });
-              const logs = await res.json();
-
-              const container = document.getElementById('securityLogContainer');
-              if (!logs.length) {
-                  container.innerHTML = '<p>No logs found.</p>';
-                  return;
-              }
-
-              container.innerHTML = logs.map(log => `
-      <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
-        <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
-        ${log.description}<br>
-        <small>Initials: ${log.initials} | Submitted by: ${log.submittedBy}</small>
-      </div>
-    `).join('');
-          } catch (err) {
-              console.error('Error loading logs:', err);
-          }
-      }
-
-      function filterSecurityLogs() {
-          const date = document.getElementById('filterDateLog').value;
-          const initials = document.getElementById('filterInitialsLog').value;
-          loadSecurityLogs(date, initials);
-      }
-
-      function clearSecurityFilters() {
-          document.getElementById('filterDateLog').value = '';
-          document.getElementById('filterInitialsLog').value = '';
-          loadSecurityLogs();
-      }
-
-      function exportSecurityLogs() {
-          const date = document.getElementById('filterDateLog').value;
-          const initials = document.getElementById('filterInitialsLog').value;
-
-          let url = '/api/security-logs?format=csv';
-          if (date) url += `&date=${encodeURIComponent(date)}`;
-          if (initials) url += `&initials=${encodeURIComponent(initials)}`;
-
-          window.open(url, '_blank');
-      }
-
-      // Load all logs when owner panel opens
-      document.addEventListener('DOMContentLoaded', loadSecurityLogs);
-
-    function goToAdmin() {
-      fetch('/api/verify-owner', {
-        method: 'GET',
-        credentials: 'include'
-      })
-        .then(res => res.ok ? window.location.href = 'admin-panel.html' : alert('Access denied'));
-    }
-
-    loadShifts();
-  </script>
+    loadInterviews();
+</script>
 </body>
 </html>

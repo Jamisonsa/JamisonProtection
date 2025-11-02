@@ -39,6 +39,19 @@
 </head>
 <body>
 <h1>Admin Panel</h1>
+<button onclick="goBackToOwner()" style="
+  background:#444;
+  color:white;
+  border:none;
+  padding:8px 14px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+  margin-bottom:15px;
+">
+    ⬅ Back to Owner Panel
+</button>
+<button class="sms-btn" onclick="sendTestSms()">Send Test SMS</button>
 
 <!-- View Logs -->
 <h2>View Logs by Date</h2>
@@ -134,6 +147,17 @@
         // Refresh user list
         fetchUsers();
     }
+    async function goBackToOwner() {
+        const res = await fetch('/api/verify-owner', { credentials: 'include' });
+        if (res.ok) {
+            window.location.href = 'owner-panel.html';
+        } else {
+            alert('Session expired. Please log in again.');
+            window.location.href = 'login.html';
+        }
+    }
+
+
     async function toggleSmsAlerts() {
         const username = prompt('Enter the username to toggle SMS alerts for:');
         if (!username) return;
@@ -185,6 +209,20 @@
             body: JSON.stringify({ notifySms: enable })
         });
         fetchUsers();
+    }
+    async function sendTestSms() {
+        const phone = prompt('Enter a phone number to send a test SMS (format: +14435551234):');
+        if (!phone) return;
+
+        const res = await fetch('/api/admin/test-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ phone })
+        });
+
+        const data = await res.json();
+        alert(data.message || 'Something went wrong.');
     }
 
     // Edit phone number

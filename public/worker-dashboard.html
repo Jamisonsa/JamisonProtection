@@ -204,6 +204,17 @@
     <div id="securityLogsContainer">
         <p>Loading logs...</p>
     </div>
+    <hr>
+    <h2>Change Password</h2>
+    <form id="changePasswordForm" onsubmit="changePassword(event)">
+        <label>Old Password:</label>
+        <input type="password" id="oldPassword" required><br><br>
+
+        <label>New Password:</label>
+        <input type="password" id="newPassword" required><br><br>
+
+        <button type="submit">Update Password</button>
+    </form>
 
 
 </main>
@@ -219,7 +230,7 @@
         container.innerHTML = available.length
         ? available.map(s => `
                 <div class="shift">
-                    <strong>${s.date} at ${s.time}</strong><br>
+                    <strong>${s.date} at ${s.startTime}</strong><br>
                     Location: ${s.location}<br>
                     Notes: ${s.notes || 'None'}<br>
                     Status: ${s.status}<br>
@@ -319,6 +330,34 @@
     `).join('');
             } catch (err) {
                 console.error('Failed to load security logs:', err);
+            }
+        }
+        async function changePassword(event) {
+            event.preventDefault();
+
+            const oldPassword = document.getElementById('oldPassword').value.trim();
+            const newPassword = document.getElementById('newPassword').value.trim();
+
+            if (!oldPassword || !newPassword) {
+                return alert('Please enter both old and new passwords.');
+            }
+
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ oldPassword, newPassword })
+                });
+
+                const data = await res.json();
+                alert(data.message);
+
+                if (res.ok) {
+                    document.getElementById('changePasswordForm').reset();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
             }
         }
 
