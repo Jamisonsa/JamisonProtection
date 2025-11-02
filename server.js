@@ -55,6 +55,13 @@ const transporter = nodemailer.createTransport({
         pass: process.env.CONTACT_EMAIL_PASS    // app password (not your normal password)
     }
 });
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const express = require('express');
 const session = require('express-session');
@@ -839,54 +846,60 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             return res.status(400).json({ message: 'Name, email, and résumé are required.' });
         }
 
-        const attachments = [];
-        if (req.files.resume?.[0]) {
-            attachments.push({ filename: req.files.resume[0].originalname, path: req.files.resume[0].path });
-        }
-        if (req.files.cover?.[0]) {
-            attachments.push({ filename: req.files.cover[0].originalname, path: req.files.cover[0].path });
+        // Upload résumé and cover letter to Cloudinary
+        const resumeFile = req.files.resume?.[0];
+        const coverFile = req.files.cover?.[0];
+
+        let resumeUrl = null;
+        let coverUrl = null;
+
+        if (resumeFile) {
+            const resumeUpload = await cloudinary.uploader.upload(resumeFile.path, {
+                folder: 'jamison_protection/resumes'
+            });
+            resumeUrl = resumeUpload.secure_url;
         }
 
-        // Save to DB
+        if (coverFile) {
+            const coverUpload = await cloudinary.uploader.upload(coverFile.path, {
+                folder: 'jamison_protection/covers'
+            });
+            coverUrl = coverUpload.secure_url;
+        }
+
+        // Save interview data to MongoDB
         const interview = new Interview({
             name,
             email,
             position,
-            resumePath: req.files.resume?.[0]?.path,
-            coverPath: req.files.cover?.[0]?.path || null
+            resumePath: resumeUrl,
+            coverPath: coverUrl
         });
         await interview.save();
 
-        // Email to you
+        // Send notification email (to owner)
         await transporter.sendMail({
             from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
             to: 'jamisonprotectionllc@gmail.com',
             subject: `📄 New Interview Request from ${name}`,
-            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nAttached: résumé and cover letter (if provided).`,
-            attachments
+            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl}\nCover Letter: ${coverUrl || 'None'}`,
         });
 
-        // Confirmation email
+        // Confirmation email to applicant
         await transporter.sendMail({
             from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
             to: email,
             subject: 'We received your application',
-            text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We have received your résumé and will review your application soon.\n\n— Jamison Protection Team`
-        });
-
-        // ✅ Cleanup uploaded files safely
-        attachments.forEach(file => {
-            fs.unlink(file.path, err => {
-                if (err) console.error('File cleanup error:', err);
-            });
+            text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We’ve received your résumé and will review your application soon.\n\n— Jamison Protection Team`
         });
 
         res.json({ message: 'Your application has been sent successfully!' });
     } catch (err) {
-        console.error('Error sending interview email:', err);
+        console.error('Error handling interview submission:', err);
         res.status(500).json({ message: 'Failed to send application. Please try again later.' });
     }
 });
+
 
 function generateICS(interview) {
     const { interviewTime, zoomLink, name, email } = interview;
