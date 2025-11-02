@@ -133,17 +133,6 @@ const Interview = mongoose.model('Interview', new mongoose.Schema({
     zoomLink: String
 }));
 
-const interview = new Interview({
-    name,
-    email,
-    position,
-    resumePath: resumeUrl,
-    resumeDownloadPath: resumeDownload,
-    coverPath: coverUrl,
-    coverDownloadPath: coverDownload
-});
-await interview.save();
-
 // ────── Seed Users ──────
 async function seedUsers() {
   const existing = await User.find();
