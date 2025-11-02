@@ -847,7 +847,7 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             attachments.push({ filename: req.files.cover[0].originalname, path: req.files.cover[0].path });
         }
 
-        // Save to DB first
+        // Save to DB
         const interview = new Interview({
             name,
             email,
@@ -866,12 +866,19 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             attachments
         });
 
-        // Confirmation to applicant
+        // Confirmation email
         await transporter.sendMail({
             from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
             to: email,
             subject: 'We received your application',
             text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We have received your résumé and will review your application soon.\n\n— Jamison Protection Team`
+        });
+
+        // ✅ Cleanup uploaded files safely
+        attachments.forEach(file => {
+            fs.unlink(file.path, err => {
+                if (err) console.error('File cleanup error:', err);
+            });
         });
 
         res.json({ message: 'Your application has been sent successfully!' });
@@ -880,6 +887,7 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         res.status(500).json({ message: 'Failed to send application. Please try again later.' });
     }
 });
+
 function generateICS(interview) {
     const { interviewTime, zoomLink, name, email } = interview;
 
