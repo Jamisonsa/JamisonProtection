@@ -848,18 +848,20 @@ function uploadRawToCloudinaryFromBuffer(file, subfolder) {
         const ext = path.extname(file.originalname).replace('.', '').toLowerCase();
         const base = path.basename(file.originalname, path.extname(file.originalname))
             .replace(/[^a-z0-9_\-]+/gi, '_');
+
+        // ✅ Define publicId before using it
         const publicId = `${subfolder}/${base}_${Date.now()}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 resource_type: 'raw',
-                public_id,
+                public_id: publicId, // use the variable here
                 overwrite: true
             },
             (err, result) => {
                 if (err) return reject(err);
 
-                // ✅ Build a download link with the real file name
+                // Create a proper download link using Cloudinary's transformation options
                 const downloadUrl = cloudinary.url(result.public_id, {
                     resource_type: 'raw',
                     type: 'upload',
@@ -869,21 +871,18 @@ function uploadRawToCloudinaryFromBuffer(file, subfolder) {
                     secure: true
                 });
 
-                // Include both view + download URLs in the result
                 result.download_url = downloadUrl;
                 resolve(result);
             }
         );
 
+        // Stream the file buffer directly to Cloudinary
         uploadStream.end(file.buffer);
     });
 }
 
-
-
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
 function rawDownloadUrl(result, originalName) {
-    // result.public_id is like 'jamison_protection/resumes/Jane_Doe_Resume_173056...' (no extension)
     const ext = path.extname(originalName).slice(1).toLowerCase();
     // Build a URL that forces download with the original filename
     return cloudinary.url(result.public_id, {
