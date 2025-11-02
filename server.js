@@ -880,27 +880,28 @@ function uploadToCloudinary(file, folder) {
 // Upload raw binary safely from memory and keep original name
 function uploadRawToCloudinaryFromBuffer(file, subfolder) {
     return new Promise((resolve, reject) => {
-        const ext = path.extname(file.originalname).slice(1).toLowerCase(); // 'pdf', 'docx', etc.
-        const base = path.basename(file.originalname, path.extname(file.originalname))
-            .replace(/[^a-z0-9_\-]+/gi, '_'); // sanitize
-        // public_id controls the saved name (include extension via 'format' below)
-        const publicId = `${subfolder}/${base}_${Date.now()}`;
+        const originalExt = path.extname(file.originalname).replace('.', '').toLowerCase(); // pdf, docx, etc.
+        const baseName = path.basename(file.originalname, path.extname(file.originalname))
+            .replace(/[^a-z0-9_\-]+/gi, '_');
+        const publicId = `${subfolder}/${baseName}_${Date.now()}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
-                resource_type: 'raw',       // critical for PDFs/DOCX
-                public_id: publicId,        // where/name to store
-                format: ext,                // ensure extension is kept on the URL
-                type: 'upload',
+                resource_type: 'raw',
+                public_id,              // Cloudinary stores it as this exact ID
+                use_filename: true,
+                unique_filename: false,
                 overwrite: true
             },
-            (err, result) => (err ? reject(err) : resolve(result))
+            (error, result) => (error ? reject(error) : resolve(result))
         );
 
-        // Stream the exact bytes we received (no encoding/conversion)
         uploadStream.end(file.buffer);
     });
 }
+const result = await uploadRawToCloudinaryFromBuffer(resumeFile, 'jamison_protection/resumes');
+const resumeUrl = result.secure_url;
+
 
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
 function rawDownloadUrl(result, originalName) {
@@ -917,6 +918,11 @@ function rawDownloadUrl(result, originalName) {
         attachment: originalName
     });
 }
+const downloadUrl = cloudinary.url(result.public_id, {
+    resource_type: 'raw',
+    flags: 'attachment',
+    attachment: file.originalname
+});
 
 
 app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
