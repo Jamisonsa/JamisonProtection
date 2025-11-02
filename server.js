@@ -835,9 +835,29 @@ app.post('/api/contact', async (req, res) => {
         res.status(500).json({ message: 'Failed to send message. Please try again later.' });
     }
 });
-// ─── Job Interview / Resume Upload ───
+// ─── Job Interview / Resume Upload (Cloudinary Stream Upload) ───
+const streamifier = require('streamifier');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' }); // temporary upload folder
+const upload = multer({ dest: 'uploads/' }); // still needed for temp files
+
+// Helper to upload files safely as raw binaries
+function uploadToCloudinary(file, folder) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'raw',  // ensures correct binary handling
+                use_filename: true,
+                unique_filename: false
+            },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+            }
+        );
+        streamifier.createReadStream(file.buffer || fs.readFileSync(file.path)).pipe(stream);
+    });
+}
 
 app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
     try {
@@ -846,7 +866,6 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             return res.status(400).json({ message: 'Name, email, and résumé are required.' });
         }
 
-        // Upload résumé and cover letter to Cloudinary
         const resumeFile = req.files.resume?.[0];
         const coverFile = req.files.cover?.[0];
 
@@ -854,28 +873,15 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         let coverUrl = null;
 
         if (resumeFile) {
-            const resumeUpload = await cloudinary.uploader.upload(resumeFile.path, {
-                folder: 'jamison_protection/resumes',
-                resource_type: 'raw',          // ✅ this is critical
-                use_filename: true,
-                unique_filename: false
-            });
+            const resumeUpload = await uploadToCloudinary(resumeFile, 'jamison_protection/resumes');
             resumeUrl = resumeUpload.secure_url;
         }
-
         if (coverFile) {
-            const coverUpload = await cloudinary.uploader.upload(coverFile.path, {
-                folder: 'jamison_protection/covers',
-                resource_type: 'raw',          // ✅ same here
-                use_filename: true,
-                unique_filename: false
-            });
+            const coverUpload = await uploadToCloudinary(coverFile, 'jamison_protection/covers');
             coverUrl = coverUpload.secure_url;
         }
 
-
-
-        // Save interview data to MongoDB
+        // Save to MongoDB
         const interview = new Interview({
             name,
             email,
@@ -885,15 +891,15 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         });
         await interview.save();
 
-        // Send notification email (to owner)
+        // Notify owner
         await transporter.sendMail({
             from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
             to: 'jamisonprotectionllc@gmail.com',
             subject: `📄 New Interview Request from ${name}`,
-            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl}\nCover Letter: ${coverUrl || 'None'}`,
+            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl}\nCover Letter: ${coverUrl || 'None'}`
         });
 
-        // Confirmation email to applicant
+        // Confirmation to applicant
         await transporter.sendMail({
             from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
             to: email,
