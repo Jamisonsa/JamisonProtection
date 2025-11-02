@@ -74,6 +74,11 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const User = require('./user');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 } // 20 MB cap; adjust if you need bigger
+});
 
 // ────── MongoDB Connection ──────
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost/jamison-protection', {
@@ -837,8 +842,8 @@ app.post('/api/contact', async (req, res) => {
 });
 // ─── Job Interview / Resume Upload (Cloudinary Stream Upload) ───
 const streamifier = require('streamifier');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' }); // still needed for temp files
+const path = require('path');
+
 
 // Helper to upload files safely as raw binaries
 function uploadToCloudinary(file, folder) {
@@ -873,6 +878,47 @@ function uploadToCloudinary(file, folder) {
     });
 }
 
+// Upload raw binary safely from memory and keep original name
+function uploadRawToCloudinaryFromBuffer(file, subfolder) {
+    return new Promise((resolve, reject) => {
+        const ext = path.extname(file.originalname).slice(1).toLowerCase(); // 'pdf', 'docx', etc.
+        const base = path.basename(file.originalname, path.extname(file.originalname))
+            .replace(/[^a-z0-9_\-]+/gi, '_'); // sanitize
+        // public_id controls the saved name (include extension via 'format' below)
+        const publicId = `${subfolder}/${base}_${Date.now()}`;
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                resource_type: 'raw',       // critical for PDFs/DOCX
+                public_id: publicId,        // where/name to store
+                format: ext,                // ensure extension is kept on the URL
+                type: 'upload',
+                overwrite: true
+            },
+            (err, result) => (err ? reject(err) : resolve(result))
+        );
+
+        // Stream the exact bytes we received (no encoding/conversion)
+        uploadStream.end(file.buffer);
+    });
+}
+
+// Nice “download with original filename” URL (optional, but fixes “file” name on download)
+function rawDownloadUrl(result, originalName) {
+    // result.public_id is like 'jamison_protection/resumes/Jane_Doe_Resume_173056...' (no extension)
+    const ext = path.extname(originalName).slice(1).toLowerCase();
+    // Build a URL that forces download with the original filename
+    return cloudinary.url(result.public_id, {
+        resource_type: 'raw',
+        type: 'upload',
+        format: ext,
+        secure: true,
+        // Force attachment with a filename:
+        flags: 'attachment',
+        attachment: originalName
+    });
+}
+
 
 app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
     try {
@@ -882,42 +928,46 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         }
 
         const resumeFile = req.files.resume?.[0];
-        const coverFile = req.files.cover?.[0];
+        const coverFile  = req.files.cover?.[0];
 
         let resumeUrl = null;
-        let coverUrl = null;
+        let coverUrl  = null;
 
         if (resumeFile) {
-            const resumeUpload = await uploadToCloudinary(resumeFile, 'jamison_protection/resumes');
-            resumeUrl = resumeUpload.secure_url;
-        }
-        if (coverFile) {
-            const coverUpload = await uploadToCloudinary(coverFile, 'jamison_protection/covers');
-            coverUrl = coverUpload.secure_url;
+            const up = await uploadRawToCloudinaryFromBuffer(resumeFile, 'jamison_protection/resumes');
+            // Use a download URL that keeps the original filename on save
+            resumeUrl = rawDownloadUrl(up, resumeFile.originalname);
         }
 
-        // Save to MongoDB
+        if (coverFile) {
+            const up = await uploadRawToCloudinaryFromBuffer(coverFile, 'jamison_protection/covers');
+            coverUrl = rawDownloadUrl(up, coverFile.originalname);
+        }
+
+        // Save to DB
         const interview = new Interview({
             name,
             email,
             position,
-            resumePath: resumeUrl,
+            resumePath: resumeUrl,  // now a stable Cloudinary URL with the proper filename
             coverPath: coverUrl
         });
         await interview.save();
 
-        // Notify owner
+        // Owner email
         await transporter.sendMail({
             from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
             to: 'jamisonprotectionllc@gmail.com',
+            cc: 'jamisonprotectionllc@gmail.com',
             subject: `📄 New Interview Request from ${name}`,
-            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl}\nCover Letter: ${coverUrl || 'None'}`
+            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl || '—'}\nCover Letter: ${coverUrl || '—'}`
         });
 
-        // Confirmation to applicant
+        // Applicant confirmation
         await transporter.sendMail({
             from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
             to: email,
+            cc: 'jamisonprotectionllc@gmail.com',
             subject: 'We received your application',
             text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We’ve received your résumé and will review your application soon.\n\n— Jamison Protection Team`
         });
@@ -928,6 +978,7 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         res.status(500).json({ message: 'Failed to send application. Please try again later.' });
     }
 });
+
 
 
 function generateICS(interview) {
