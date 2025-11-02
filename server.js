@@ -899,8 +899,6 @@ function uploadRawToCloudinaryFromBuffer(file, subfolder) {
         uploadStream.end(file.buffer);
     });
 }
-const result = await uploadRawToCloudinaryFromBuffer(resumeFile, 'jamison_protection/resumes');
-const resumeUrl = result.secure_url;
 
 
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
