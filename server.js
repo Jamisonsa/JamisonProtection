@@ -855,17 +855,20 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
 
         if (resumeFile) {
             const resumeUpload = await cloudinary.uploader.upload(resumeFile.path, {
-                folder: 'jamison_protection/resumes'
+                folder: 'jamison_protection/resumes',
+                resource_type: 'raw'   // <-- this line fixes the ZIP/PDF error
             });
             resumeUrl = resumeUpload.secure_url;
         }
 
         if (coverFile) {
             const coverUpload = await cloudinary.uploader.upload(coverFile.path, {
-                folder: 'jamison_protection/covers'
+                folder: 'jamison_protection/covers',
+                resource_type: 'raw'   // <-- same here
             });
             coverUrl = coverUpload.secure_url;
         }
+
 
         // Save interview data to MongoDB
         const interview = new Interview({
