@@ -108,7 +108,7 @@
         </tr>
         </thead>
         <tbody id="interviewBody">
-        <tr><td colspan="8">Loading interviews...</td></tr>
+        <tr><td colspan="8" style="text-align:center;">Loading interviews...</td></tr>
         </tbody>
     </table>
 </main>
@@ -122,6 +122,7 @@
         const res = await fetch('/api/interviews', { credentials: 'include' });
         const data = await res.json();
         const tbody = document.getElementById('interviewBody');
+
         if (!data.length) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No interview submissions yet.</td></tr>';
             return;
