@@ -843,21 +843,36 @@ const upload = multer({ dest: 'uploads/' }); // still needed for temp files
 // Helper to upload files safely as raw binaries
 function uploadToCloudinary(file, folder) {
     return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-            {
-                folder,
-                resource_type: 'raw',  // ensures correct binary handling
-                use_filename: true,
-                unique_filename: false
-            },
+        // extract original filename without path
+        const originalName = file.originalname
+            ? file.originalname.replace(/\.[^/.]+$/, '') // remove extension
+            : 'file';
+
+        const ext = file.originalname?.split('.').pop() || '';
+        const publicId = `${originalName}_${Date.now()}`;
+
+        const options = {
+            folder,
+            resource_type: 'raw',       // ensures binary-safe upload
+            public_id: publicId,        // keep filename
+            use_filename: true,
+            unique_filename: false,
+            type: 'upload',
+            format: ext                 // tells Cloudinary what type to save as
+        };
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+            options,
             (error, result) => {
                 if (error) reject(error);
                 else resolve(result);
             }
         );
-        streamifier.createReadStream(file.buffer || fs.readFileSync(file.path)).pipe(stream);
+
+        streamifier.createReadStream(file.buffer || fs.readFileSync(file.path)).pipe(uploadStream);
     });
 }
+
 
 app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]), async (req, res) => {
     try {
