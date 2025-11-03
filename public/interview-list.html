@@ -143,23 +143,15 @@
   <td>${i.position || '—'}</td>
   <td>${new Date(i.submittedAt).toLocaleString()}</td>
 
-  <td>
-    ${i.resumePath
-            ? `
-        <a href="${i.resumePath}" class="link" target="_blank">View</a>
-        ${i.resumeDownloadPath ? ` | <a href="${i.resumeDownloadPath}" class="link" download>Download</a>` : ''}
-      `
-            : '—'}
-  </td>
+ <td>
+  ${i.resumePath ? `<a href="${i.resumePath}" target="_blank" class="link">View</a>` : '—'}
+  ${i.resumeDownloadPath ? ` | <a href="${i.resumeDownloadPath}" class="link" download>Download</a>` : ''}
+</td>
+<td>
+  ${i.coverPath ? `<a href="${i.coverPath}" target="_blank" class="link">View</a>` : '—'}
+  ${i.coverDownloadPath ? ` | <a href="${i.coverDownloadPath}" class="link" download>Download</a>` : ''}
+</td>
 
-  <td>
-    ${i.coverPath
-            ? `
-        <a href="${i.coverPath}" class="link" target="_blank">View</a>
-        ${i.coverDownloadPath ? ` | <a href="${i.coverDownloadPath}" class="link" download>Download</a>` : ''}
-      `
-            : '—'}
-  </td>
 
   <td>
     ${i.interviewTime

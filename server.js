@@ -330,9 +330,11 @@ app.post('/api/admin/test-sms', requireLogin, isOwner, async (req, res) => {
         console.log(`📤 Test SMS sent to ${phone}`);
         res.json({ message: `Test SMS successfully sent to ${phone}` });
     } catch (err) {
-        console.error('Error sending test SMS:', err.message || err);
-        res.status(500).json({ message: 'Failed to send test SMS.' });
+        console.error('Error sending test SMS:', err);
+        if (err.code) console.error(`Twilio Error Code: ${err.code}`);
+        res.status(500).json({ message: 'Failed to send test SMS.', error: err.message });
     }
+
 });
 
 app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
@@ -1078,8 +1080,6 @@ app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-
 // ────── Start Server ──────
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
