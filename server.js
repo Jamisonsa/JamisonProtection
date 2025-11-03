@@ -853,19 +853,18 @@ function uploadRawToCloudinaryFromBuffer(file, subfolder) {
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
-                resource_type: 'raw',       // ✅ always store binary as raw
+                resource_type: 'raw',
                 public_id: publicId,
                 overwrite: true,
                 use_filename: true,
-                unique_filename: false
+                unique_filename: false,
+                // ✅ Tell Cloudinary the real MIME type (prevents PDF corruption)
+                content_type: file.mimetype
             },
             (err, result) => {
                 if (err) return reject(err);
 
-                // ✅ Always use versioned URL to avoid cached mismatches
                 const viewUrl = result.secure_url;
-
-                // ✅ Safe download URL preserving original name, NO format forcing
                 const downloadUrl = cloudinary.url(result.public_id, {
                     resource_type: 'raw',
                     type: 'upload',
@@ -883,12 +882,11 @@ function uploadRawToCloudinaryFromBuffer(file, subfolder) {
             }
         );
 
-        // ✅ Make sure MIME type is preserved in the stream
-        const stream = streamifier.createReadStream(file.buffer);
+        // ✅ Binary-safe streaming
+        const stream = streamifier.createReadStream(file.buffer, { encoding: null });
         stream.pipe(uploadStream);
     });
 }
-
 
 
 // Nice “download with original filename” URL (optional, but fixes “file” name on download)
