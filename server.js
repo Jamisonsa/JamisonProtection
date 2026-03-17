@@ -134,15 +134,32 @@ const Interview = mongoose.model('Interview', new mongoose.Schema({
     name: String,
     email: String,
     position: String,
+
     resumePath: String,
     resumeDownloadPath: String,
     resumeOriginalName: String,
+    resumeMimeType: String,
+
     coverPath: String,
     coverDownloadPath: String,
     coverOriginalName: String,
+    coverMimeType: String,
+
     submittedAt: { type: Date, default: Date.now },
+
     interviewTime: String,
-    zoomLink: String
+    zoomLink: String,
+
+    status: {
+        type: String,
+        enum: ['New', 'Reviewed', 'Interview Scheduled', 'Rejected', 'Hired'],
+        default: 'New'
+    },
+
+    notes: { type: String, default: '' },
+    reviewedAt: Date,
+    hiredAt: Date,
+    hiredWorkerUsername: String
 }));
 
 // ────── Seed Users ──────
@@ -947,12 +964,16 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             name,
             email,
             position,
+
             resumePath: resumeUrl,
             resumeDownloadPath: resumeDownload,
             resumeOriginalName: resumeFile ? resumeFile.originalname : null,
+            resumeMimeType: resumeFile ? resumeFile.mimetype : null,
+
             coverPath: coverUrl,
             coverDownloadPath: coverDownload,
-            coverOriginalName: coverFile ? coverFile.originalname : null
+            coverOriginalName: coverFile ? coverFile.originalname : null,
+            coverMimeType: coverFile ? coverFile.mimetype : null
         });
 
         await interview.save();
@@ -1055,10 +1076,10 @@ app.post('/api/interviews/schedule', requireLogin, isOwner, async (req, res) => 
         if (!interview) return res.status(404).json({ message: 'Interview not found.' });
 
         interview.interviewTime = time;
-        interview.zoomLink = meetLink; // reusing field name
+        interview.zoomLink = meetLink;
+        interview.status = 'Interview Scheduled';
         await interview.save();
 
-        // Send a clean HTML email w/ button + calendar invite
         const icsContent = generateICS(interview);
 
         await transporter.sendMail({
@@ -1092,7 +1113,6 @@ app.post('/api/interviews/schedule', requireLogin, isOwner, async (req, res) => 
             ]
         });
 
-
         res.json({ message: 'Interview scheduled and Meet link sent successfully.' });
     } catch (err) {
         console.error('Error scheduling interview:', err);
@@ -1116,6 +1136,7 @@ app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
         if (!interview) return res.status(404).send('Interview not found');
 
         const fileType = req.query.type === 'cover' ? 'cover' : 'resume';
+        const mode = req.query.mode === 'preview' ? 'preview' : 'download';
 
         const fileUrl = fileType === 'cover'
             ? (interview.coverDownloadPath || interview.coverPath)
@@ -1125,6 +1146,10 @@ app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
             ? (interview.coverOriginalName || 'cover-letter')
             : (interview.resumeOriginalName || 'resume');
 
+        const mimeType = fileType === 'cover'
+            ? (interview.coverMimeType || 'application/octet-stream')
+            : (interview.resumeMimeType || 'application/octet-stream');
+
         if (!fileUrl) return res.status(404).send('File not found');
 
         const response = await fetch(fileUrl);
@@ -1132,21 +1157,133 @@ app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
             return res.status(502).send('Failed to fetch file from storage');
         }
 
-        const contentType =
-            response.headers.get('content-type') || 'application/octet-stream';
-
         const buffer = Buffer.from(await response.arrayBuffer());
+        const safeName = originalName.replace(/"/g, '');
 
-        res.setHeader('Content-Type', contentType);
-        res.setHeader(
-            'Content-Disposition',
-            `attachment; filename="${originalName.replace(/"/g, '')}"`
-        );
+        res.setHeader('Content-Type', mimeType);
+
+        if (mode === 'preview' && mimeType === 'application/pdf') {
+            res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+        } else {
+            res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        }
 
         res.send(buffer);
     } catch (err) {
         console.error('Error serving interview file:', err);
         res.status(500).send('Server error');
+    }
+});
+app.put('/api/interviews/:id/status', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { status } = req.body;
+
+        const allowed = ['New', 'Reviewed', 'Interview Scheduled', 'Rejected', 'Hired'];
+        if (!allowed.includes(status)) {
+            return res.status(400).json({ message: 'Invalid status.' });
+        }
+
+        const interview = await Interview.findById(req.params.id);
+        if (!interview) return res.status(404).json({ message: 'Interview not found.' });
+
+        interview.status = status;
+        if (status === 'Reviewed' && !interview.reviewedAt) {
+            interview.reviewedAt = new Date();
+        }
+
+        await interview.save();
+        res.json({ message: 'Status updated successfully.' });
+    } catch (err) {
+        console.error('Error updating interview status:', err);
+        res.status(500).json({ message: 'Failed to update status.' });
+    }
+});
+
+app.put('/api/interviews/:id/notes', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { notes } = req.body;
+
+        const interview = await Interview.findById(req.params.id);
+        if (!interview) return res.status(404).json({ message: 'Interview not found.' });
+
+        interview.notes = notes || '';
+        await interview.save();
+
+        res.json({ message: 'Notes saved successfully.' });
+    } catch (err) {
+        console.error('Error saving interview notes:', err);
+        res.status(500).json({ message: 'Failed to save notes.' });
+    }
+});
+function generateTempPassword(length = 10) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
+    let pwd = '';
+    for (let i = 0; i < length; i++) {
+        pwd += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return pwd;
+}
+
+function makeUsernameFromEmail(email) {
+    return email.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase();
+}
+
+app.post('/api/interviews/:id/hire', requireLogin, isOwner, async (req, res) => {
+    try {
+        const interview = await Interview.findById(req.params.id);
+        if (!interview) return res.status(404).json({ message: 'Interview not found.' });
+
+        let username = makeUsernameFromEmail(interview.email);
+        let finalUsername = username;
+        let counter = 1;
+
+        while (await User.findOne({ username: finalUsername })) {
+            finalUsername = `${username}${counter}`;
+            counter++;
+        }
+
+        const tempPassword = generateTempPassword();
+
+        const newWorker = new User({
+            username: finalUsername,
+            password: tempPassword,
+            role: 'worker',
+            hourlyRate: 25
+        });
+
+        await newWorker.save();
+
+        interview.status = 'Hired';
+        interview.hiredAt = new Date();
+        interview.hiredWorkerUsername = finalUsername;
+        await interview.save();
+
+        await transporter.sendMail({
+            from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: interview.email,
+            cc: 'jamisonprotectionllc@gmail.com',
+            subject: 'You Have Been Hired by Jamison Protection',
+            text: `Hi ${interview.name},
+
+Congratulations! You have been hired by Jamison Protection.
+
+Your worker account has been created.
+
+Username: ${finalUsername}
+Temporary Password: ${tempPassword}
+
+Please log in and change your password as soon as possible.
+
+— Jamison Protection Team`
+        });
+
+        res.json({
+            message: `Applicant hired successfully. Worker account created for ${finalUsername}.`,
+            username: finalUsername
+        });
+    } catch (err) {
+        console.error('Error hiring applicant:', err);
+        res.status(500).json({ message: 'Failed to hire applicant.' });
     }
 });
 // ────── Start Server ──────

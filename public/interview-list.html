@@ -110,8 +110,8 @@
             <th>Submitted</th>
             <th>Résumé</th>
             <th>Cover Letter</th>
-            <th>Interview</th>
-            <th>Actions</th>
+            <th>Interview / Status</th>
+            <th>Actions / Notes</th>
         </tr>
         </thead>
         <tbody id="interviewBody">
@@ -119,14 +119,13 @@
         </tbody>
     </table>
 </main>
-
 <script>
     function goBack() {
         window.location.href = 'owner-panel.html';
     }
 
     async function loadInterviews() {
-        const res = await fetch('/api/interviews', {credentials: 'include'});
+        const res = await fetch('/api/interviews', { credentials: 'include' });
         const data = await res.json();
         const tbody = document.getElementById('interviewBody');
 
@@ -135,39 +134,116 @@
             return;
         }
 
-        tbody.innerHTML = data.map(i => `
+        tbody.innerHTML = data.map(i => {
+            const resumeIsPdf = i.resumeMimeType === 'application/pdf';
+            const coverIsPdf = i.coverMimeType === 'application/pdf';
+
+            return `
 <tr class="${i.interviewTime ? 'scheduled' : ''}">
   <td>${i.name}</td>
   <td>${i.email}</td>
   <td>${i.position || '—'}</td>
   <td>${new Date(i.submittedAt).toLocaleString()}</td>
 
-<td>
-  ${i.resumePath ? `<a href="/api/interviews/file/${i._id}?type=resume" class="link">Download</a>` : '—'}
-</td>
-<td>
-  ${i.coverPath ? `<a href="/api/interviews/file/${i._id}?type=cover" class="link">Download</a>` : '—'}
-</td>
+  <td>
+    ${i.resumePath
+                ? `
+          ${resumeIsPdf ? `<a href="/api/interviews/file/${i._id}?type=resume&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
+          <a href="/api/interviews/file/${i._id}?type=resume" class="link">Download</a>
+        `
+                : '—'}
+  </td>
+
+  <td>
+    ${i.coverPath
+                ? `
+          ${coverIsPdf ? `<a href="/api/interviews/file/${i._id}?type=cover&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
+          <a href="/api/interviews/file/${i._id}?type=cover" class="link">Download</a>
+        `
+                : '—'}
+  </td>
 
   <td>
     ${i.interviewTime
-            ? `<span class="status">📅 ${i.interviewTime}<br>
-         🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a>
-         <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy</button>
-         </span>`
-            : '<span class="status">Not scheduled</span>'}
+                ? `<span class="status">📅 ${i.interviewTime}<br>
+           🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a><br>
+           <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy Link</button>
+           </span>`
+                : '<span class="status">Not scheduled</span>'}
+
+    <div style="margin-top:8px;">
+      <select onchange="updateStatus('${i._id}', this.value)" style="padding:6px; border-radius:4px;">
+        <option value="New" ${i.status === 'New' ? 'selected' : ''}>New</option>
+        <option value="Reviewed" ${i.status === 'Reviewed' ? 'selected' : ''}>Reviewed</option>
+        <option value="Interview Scheduled" ${i.status === 'Interview Scheduled' ? 'selected' : ''}>Interview Scheduled</option>
+        <option value="Rejected" ${i.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+        <option value="Hired" ${i.status === 'Hired' ? 'selected' : ''}>Hired</option>
+      </select>
+      <div class="status" style="margin-top:4px;">Status: ${i.status || 'New'}</div>
+    </div>
   </td>
 
   <td>
     <button class="action-btn" onclick="schedule('${i._id}')">Schedule</button>
+    <button class="action-btn" onclick="editNotes('${i._id}', ${JSON.stringify(i.notes || '')})" style="margin-top:6px;">Notes</button>
+    <button class="action-btn" onclick="hireApplicant('${i._id}')" style="margin-top:6px; background:#2e7d32;">Hire</button>
+
+    <div class="status" style="margin-top:8px;">
+      ${i.notes ? `📝 ${i.notes}` : 'No notes yet'}
+      ${i.hiredWorkerUsername ? `<br>👤 Worker: ${i.hiredWorkerUsername}` : ''}
+    </div>
   </td>
 </tr>
-`).join('');
+`;
+        }).join('');
     }
 
-        async function schedule(id) {
+    async function updateStatus(id, status) {
+        const res = await fetch(`/api/interviews/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        loadInterviews();
+    }
+
+    async function editNotes(id, currentNotes) {
+        const notes = prompt('Enter applicant notes:', currentNotes || '');
+        if (notes === null) return;
+
+        const res = await fetch(`/api/interviews/${id}/notes`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ notes })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        loadInterviews();
+    }
+
+    async function hireApplicant(id) {
+        if (!confirm('Hire this applicant and create a worker account?')) return;
+
+        const res = await fetch(`/api/interviews/${id}/hire`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        loadInterviews();
+    }
+
+    async function schedule(id) {
         const time = prompt('Enter interview date/time (e.g. Nov 10 2025 10:00 AM):');
         if (!time) return;
+
         const meetLink = prompt('Paste the Google Meet link:');
         if (!meetLink) return;
 
@@ -183,7 +259,6 @@
         loadInterviews();
     }
 
-    loadInterviews();
     function filterInterviews() {
         const q = document.getElementById('searchBox').value.toLowerCase();
         document.querySelectorAll('#interviewBody tr').forEach(row => {
@@ -192,6 +267,7 @@
         });
     }
 
+    loadInterviews();
 </script>
 </body>
 </html>
