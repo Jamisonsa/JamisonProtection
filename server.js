@@ -51,8 +51,16 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.CONTACT_EMAIL_USER,   // your Gmail or domain email
-        pass: process.env.CONTACT_EMAIL_PASS    // app password (not your normal password)
+        user: process.env.CONTACT_EMAIL_USER,
+        pass: process.env.CONTACT_EMAIL_PASS
+    }
+});
+
+transporter.verify((err, success) => {
+    if (err) {
+        console.error('Nodemailer config error:', err);
+    } else {
+        console.log('✅ Nodemailer is ready');
     }
 });
 const cloudinary = require('cloudinary').v2;
@@ -127,7 +135,9 @@ const Interview = mongoose.model('Interview', new mongoose.Schema({
     email: String,
     position: String,
     resumePath: String,
+    resumeDownloadPath: String,
     coverPath: String,
+    coverDownloadPath: String,
     submittedAt: { type: Date, default: Date.now },
     interviewTime: String,
     zoomLink: String
@@ -912,9 +922,8 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
         }
 
         const resumeFile = req.files.resume?.[0];
-        const coverFile  = req.files.cover?.[0];
+        const coverFile = req.files.cover?.[0];
 
-// Upload résumé and cover letter
         let resumeUrl = null;
         let resumeDownload = null;
         let coverUrl = null;
@@ -922,48 +931,85 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
 
         if (resumeFile) {
             const up = await uploadRawToCloudinaryFromBuffer(resumeFile, 'jamison_protection/resumes');
-            resumeUrl = up.secure_url;         // "View" link
-            resumeDownload = up.download_url;  // "Download" link
+            resumeUrl = up.secure_url;
+            resumeDownload = up.download_url;
         }
 
         if (coverFile) {
             const up = await uploadRawToCloudinaryFromBuffer(coverFile, 'jamison_protection/covers');
-            coverUrl = up.secure_url;          // "View" link
-            coverDownload = up.download_url;   // "Download" link
+            coverUrl = up.secure_url;
+            coverDownload = up.download_url;
         }
 
-        // Save to DB
         const interview = new Interview({
             name,
             email,
             position,
-            resumePath: resumeUrl,  // now a stable Cloudinary URL with the proper filename
-            coverPath: coverUrl
+            resumePath: resumeUrl,
+            coverPath: coverUrl,
+            resumeDownloadPath: resumeDownload,
+            coverDownloadPath: coverDownload
         });
+
         await interview.save();
 
-        // Owner email
-        await transporter.sendMail({
-            from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
-            to: 'jamisonprotectionllc@gmail.com',
-            cc: 'jamisonprotectionllc@gmail.com',
-            subject: `📄 New Interview Request from ${name}`,
-            text: `Applicant Details:\n\nName: ${name}\nEmail: ${email}\nPosition: ${position || 'Not specified'}\n\nRésumé: ${resumeUrl || '—'}\nCover Letter: ${coverUrl || '—'}`
+        let ownerEmailSent = false;
+        let applicantEmailSent = false;
+        let emailErrors = [];
+
+        try {
+            await transporter.sendMail({
+                from: `"Jamison Protection Careers" <${process.env.CONTACT_EMAIL_USER}>`,
+                to: 'jamisonprotectionllc@gmail.com',
+                subject: `📄 New Interview Request from ${name}`,
+                text:
+                    `Applicant Details:
+
+Name: ${name}
+Email: ${email}
+Position: ${position || 'Not specified'}
+
+Résumé (view): ${resumeUrl || '—'}
+Résumé (download): ${resumeDownload || '—'}
+Cover Letter (view): ${coverUrl || '—'}
+Cover Letter (download): ${coverDownload || '—'}`
+            });
+            ownerEmailSent = true;
+        } catch (err) {
+            console.error('Owner email failed:', err);
+            emailErrors.push(`Owner email failed: ${err.message}`);
+        }
+
+        try {
+            await transporter.sendMail({
+                from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
+                to: email,
+                subject: 'We received your application',
+                text: `Hi ${name},
+
+Thank you for applying to Jamison Protection. We’ve received your résumé and will review your application soon.
+
+— Jamison Protection Team`
+            });
+            applicantEmailSent = true;
+        } catch (err) {
+            console.error('Applicant email failed:', err);
+            emailErrors.push(`Applicant email failed: ${err.message}`);
+        }
+
+        return res.status(200).json({
+            message: ownerEmailSent && applicantEmailSent
+                ? 'Your application has been submitted successfully!'
+                : 'Your application was saved, but one or more email notifications failed.',
+            applicationSaved: true,
+            ownerEmailSent,
+            applicantEmailSent,
+            emailErrors
         });
 
-        // Applicant confirmation
-        await transporter.sendMail({
-            from: `"Jamison Protection" <${process.env.CONTACT_EMAIL_USER}>`,
-            to: email,
-            cc: 'jamisonprotectionllc@gmail.com',
-            subject: 'We received your application',
-            text: `Hi ${name},\n\nThank you for applying to Jamison Protection. We’ve received your résumé and will review your application soon.\n\n— Jamison Protection Team`
-        });
-
-        res.json({ message: 'Your application has been sent successfully!' });
     } catch (err) {
         console.error('Error handling interview submission:', err);
-        res.status(500).json({ message: 'Failed to send application. Please try again later.' });
+        res.status(500).json({ message: 'Failed to submit application. Please try again later.' });
     }
 });
 
@@ -1067,11 +1113,16 @@ app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
         if (!interview) return res.status(404).send('Interview not found');
 
         const fileType = req.query.type || 'resume';
-        const fileUrl = fileType === 'cover' ? interview.coverPath : interview.resumePath;
+
+        let fileUrl = null;
+        if (fileType === 'cover') {
+            fileUrl = interview.coverDownloadPath || interview.coverPath;
+        } else {
+            fileUrl = interview.resumeDownloadPath || interview.resumePath;
+        }
 
         if (!fileUrl) return res.status(404).send('File not found');
 
-        // Redirect browser straight to Cloudinary
         res.redirect(fileUrl);
     } catch (err) {
         console.error('Error redirecting to file:', err);
