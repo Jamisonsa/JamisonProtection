@@ -142,13 +142,12 @@
   <td>${i.position || '—'}</td>
   <td>${new Date(i.submittedAt).toLocaleString()}</td>
 
-  <td>
-    ${i.resumePath ? `<a href="/api/interviews/file/${i._id}?type=resume" target="_blank" class="link">Download</a>` : '—'}
-  </td>
-
-  <td>
-    ${i.coverPath ? `<a href="/api/interviews/file/${i._id}?type=cover" target="_blank" class="link">Download</a>` : '—'}
-  </td>
+<td>
+  ${i.resumePath ? `<a href="/api/interviews/file/${i._id}?type=resume" class="link">Download</a>` : '—'}
+</td>
+<td>
+  ${i.coverPath ? `<a href="/api/interviews/file/${i._id}?type=cover" class="link">Download</a>` : '—'}
+</td>
 
   <td>
     ${i.interviewTime

@@ -136,8 +136,10 @@ const Interview = mongoose.model('Interview', new mongoose.Schema({
     position: String,
     resumePath: String,
     resumeDownloadPath: String,
+    resumeOriginalName: String,
     coverPath: String,
     coverDownloadPath: String,
+    coverOriginalName: String,
     submittedAt: { type: Date, default: Date.now },
     interviewTime: String,
     zoomLink: String
@@ -946,9 +948,11 @@ app.post('/api/interview', upload.fields([{ name: 'resume' }, { name: 'cover' }]
             email,
             position,
             resumePath: resumeUrl,
-            coverPath: coverUrl,
             resumeDownloadPath: resumeDownload,
-            coverDownloadPath: coverDownload
+            resumeOriginalName: resumeFile ? resumeFile.originalname : null,
+            coverPath: coverUrl,
+            coverDownloadPath: coverDownload,
+            coverOriginalName: coverFile ? coverFile.originalname : null
         });
 
         await interview.save();
@@ -1106,26 +1110,42 @@ app.get('/api/interviews', requireLogin, isOwner, async (_req, res) => {
     }
 });
 
-// Serve uploaded résumé/cover links (redirect to Cloudinary URLs)
 app.get('/api/interviews/file/:id', requireLogin, isOwner, async (req, res) => {
     try {
         const interview = await Interview.findById(req.params.id);
         if (!interview) return res.status(404).send('Interview not found');
 
-        const fileType = req.query.type || 'resume';
+        const fileType = req.query.type === 'cover' ? 'cover' : 'resume';
 
-        let fileUrl = null;
-        if (fileType === 'cover') {
-            fileUrl = interview.coverDownloadPath || interview.coverPath;
-        } else {
-            fileUrl = interview.resumeDownloadPath || interview.resumePath;
-        }
+        const fileUrl = fileType === 'cover'
+            ? (interview.coverDownloadPath || interview.coverPath)
+            : (interview.resumeDownloadPath || interview.resumePath);
+
+        const originalName = fileType === 'cover'
+            ? (interview.coverOriginalName || 'cover-letter')
+            : (interview.resumeOriginalName || 'resume');
 
         if (!fileUrl) return res.status(404).send('File not found');
 
-        res.redirect(fileUrl);
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+            return res.status(502).send('Failed to fetch file from storage');
+        }
+
+        const contentType =
+            response.headers.get('content-type') || 'application/octet-stream';
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${originalName.replace(/"/g, '')}"`
+        );
+
+        res.send(buffer);
     } catch (err) {
-        console.error('Error redirecting to file:', err);
+        console.error('Error serving interview file:', err);
         res.status(500).send('Server error');
     }
 });
