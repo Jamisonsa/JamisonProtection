@@ -137,30 +137,26 @@
 
         tbody.innerHTML = data.map(i => `
 <tr class="${i.interviewTime ? 'scheduled' : ''}">
-
   <td>${i.name}</td>
   <td>${i.email}</td>
   <td>${i.position || '—'}</td>
   <td>${new Date(i.submittedAt).toLocaleString()}</td>
 
- <td>
-  ${i.resumePath ? `<a href="${i.resumePath}" target="_blank" class="link">View</a>` : '—'}
-  ${i.resumeDownloadPath ? ` | <a href="${i.resumeDownloadPath}" class="link" download>Download</a>` : ''}
-</td>
-<td>
-  ${i.coverPath ? `<a href="${i.coverPath}" target="_blank" class="link">View</a>` : '—'}
-  ${i.coverDownloadPath ? ` | <a href="${i.coverDownloadPath}" class="link" download>Download</a>` : ''}
-</td>
+  <td>
+    ${i.resumePath ? `<a href="/api/interviews/file/${i._id}?type=resume" target="_blank" class="link">Download</a>` : '—'}
+  </td>
 
+  <td>
+    ${i.coverPath ? `<a href="/api/interviews/file/${i._id}?type=cover" target="_blank" class="link">Download</a>` : '—'}
+  </td>
 
   <td>
     ${i.interviewTime
             ? `<span class="status">📅 ${i.interviewTime}<br>
-     🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a>
-     <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy</button>
-     </span>`
+         🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a>
+         <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy</button>
+         </span>`
             : '<span class="status">Not scheduled</span>'}
-
   </td>
 
   <td>
