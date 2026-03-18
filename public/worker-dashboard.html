@@ -322,73 +322,81 @@
             : '<p>You have no claimed shifts.</p>';
     }
 
-    async function loadShiftCalendar() {
+        async function loadShiftCalendar() {
         try {
-            const res = await fetch('/api/worker-calendar', { credentials: 'include' });
-            if (res.status === 401) return location.href = 'login.html';
+        const res = await fetch('/api/worker-calendar', { credentials: 'include' });
+        if (res.status === 401) return location.href = 'login.html';
 
-            const events = await res.json();
-            const calendarEl = document.getElementById('shiftCalendar');
+        const events = await res.json();
+        const calendarEl = document.getElementById('shiftCalendar');
 
-            if (calendar) {
-                calendar.destroy();
-            }
-
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                height: 'auto',
-                events,
-                eventDidMount(info) {
-                    if (info.event.extendedProps.type === 'claimed') {
-                        info.el.style.backgroundColor = '#2e7d32';
-                        info.el.style.borderColor = '#2e7d32';
-                    } else {
-                        info.el.style.backgroundColor = '#e63946';
-                        info.el.style.borderColor = '#e63946';
-                    }
-                },
-                eventClick(info) {
-                    const e = info.event;
-                    const p = e.extendedProps;
-
-                    selectedShiftId = e.id;
-                    selectedShiftType = p.type || 'available';
-
-                    const start = e.start;
-                    const formattedDate = start
-                        ? start.toLocaleDateString('en-CA')
-                        : "N/A";
-
-                    const formattedTime = start
-                        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        : "N/A";
-
-                    document.getElementById("modalTitle").textContent = e.title;
-                    document.getElementById("modalDate").textContent = formattedDate;
-                    document.getElementById("modalStart").textContent = formattedTime;
-                    document.getElementById("modalEnd").textContent = p.expectedEnd || "N/A";
-                    document.getElementById("modalLocation").textContent = p.location || "N/A";
-                    document.getElementById("modalPosition").textContent = p.position || "N/A";
-                    document.getElementById("modalNotes").textContent = p.notes || "None";
-
-                    const actionBtn = document.getElementById("modalActionBtn");
-
-                    if (selectedShiftType === 'claimed') {
-                        actionBtn.textContent = "Drop Shift";
-                        actionBtn.style.background = "#b8860b";
-                    } else {
-                        actionBtn.textContent = "Claim Shift";
-                        actionBtn.style.background = "#e63946";
-                    }
-
-                    document.getElementById("shiftModal").style.display = "block";
-                }
-
-            calendar.render();
-        } catch (err) {
-            console.error('Failed to load shift calendar:', err);
-        }
+        if (calendar) {
+        calendar.destroy();
     }
+
+        calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        height: 'auto',
+        events,
+        eventDidMount(info) {
+        if (info.event.extendedProps.type === 'claimed') {
+        info.el.style.backgroundColor = '#2e7d32';
+        info.el.style.borderColor = '#2e7d32';
+    } else {
+        info.el.style.backgroundColor = '#e63946';
+        info.el.style.borderColor = '#e63946';
+    }
+    },
+        eventClick(info) {
+        const e = info.event;
+        const p = e.extendedProps;
+
+        selectedShiftId = e.id;
+        selectedShiftType = p.type || 'available';
+
+        const start = e.start;
+        const formattedDate = start
+        ? start.toLocaleDateString('en-CA')
+        : 'N/A';
+
+        const formattedTime = start
+        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        : 'N/A';
+
+        document.getElementById('modalTitle').textContent = e.title;
+        document.getElementById('modalDate').textContent = formattedDate;
+        document.getElementById('modalStart').textContent = formattedTime;
+        document.getElementById('modalEnd').textContent = p.expectedEnd || 'N/A';
+        document.getElementById('modalLocation').textContent = p.location || 'N/A';
+        document.getElementById('modalPosition').textContent = p.position || 'N/A';
+        document.getElementById('modalNotes').textContent = p.notes || 'None';
+
+        const actionBtn = document.getElementById('modalActionBtn');
+
+        if (selectedShiftType === 'claimed') {
+        actionBtn.textContent = 'Drop Shift';
+        actionBtn.style.background = '#b8860b';
+    } else {
+        actionBtn.textContent = 'Claim Shift';
+        actionBtn.style.background = '#e63946';
+    }
+
+        document.getElementById('shiftModal').style.display = 'block';
+    }
+    });
+
+        calendar.render();
+    } catch (err) {
+        console.error('Failed to load shift calendar:', err);
+    }
+    }
+
+        window.onclick = function(event) {
+        const modal = document.getElementById('shiftModal');
+        if (event.target === modal) {
+        closeModal();
+    }
+    };
     function closeModal() {
         document.getElementById("shiftModal").style.display = "none";
         selectedShiftId = null;
@@ -430,8 +438,7 @@
     window.onclick = function(event) {
         const modal = document.getElementById("shiftModal");
         if (event.target === modal) {
-            modal.style.display = "none";
-        }
+            closeModal();        }
     };
     async function submitHours(event) {
         event.preventDefault();
