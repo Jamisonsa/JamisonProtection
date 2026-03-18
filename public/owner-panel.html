@@ -202,7 +202,7 @@
             display: block;
         }
 
-        table, th, td {
+        .payroll-table, .payroll-table th, .payroll-table td {
             border: 1px solid #555;
             padding: 8px;
             text-align: center;
@@ -255,25 +255,6 @@
             border-radius: 10px;
         }
 
-        .fc {
-            background: #1f1f1f;
-            color: white;
-        }
-
-        .fc-toolbar-title {
-            color: #f2c744;
-        }
-
-        .fc-button {
-            background: #e63946 !important;
-            border: none !important;
-            color: white !important;
-        }
-
-        .fc-button:hover {
-            background: #c5303d !important;
-        }
-
         .top-actions {
             display: flex;
             flex-wrap: wrap;
@@ -284,6 +265,80 @@
 
         .top-actions button {
             width: auto;
+        }
+        .fc {
+            background: #1f1f1f;
+            color: white;
+        }
+        .fc-toolbar-title {
+            color: #f2c744;
+        }
+        .fc-button {
+            background: #e63946 !important;
+            border: none !important;
+            color: white !important;
+        }
+        .fc-button:hover {
+            background: #c5303d !important;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+        }
+
+        .modal-content {
+            background-color: #1f1f1f;
+            margin: auto;
+            padding: 25px;
+            border-radius: 10px;
+            width: 400px;
+            color: white;
+            border-left: 5px solid #e63946;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: white;
+        }
+        .fc-col-header-cell {
+            background: #2a2a2a !important;
+        }
+        .fc-col-header-cell-cushion {
+            color: #ffffff !important;
+            text-decoration: none !important;
+            font-weight: 700 !important;
+            font-size: 14px;
+            padding: 8px 4px;
+            display: inline-block;
+        }
+
+        .fc-daygrid-day-number {
+            color: #f0f0f0 !important;
+            text-decoration: none !important;
+        }
+
+        .fc-theme-standard th,
+        .fc-theme-standard td,
+        .fc-scrollgrid,
+        .fc-scrollgrid table {
+            border-color: #555 !important;
+        }
+
+        .fc-day-today {
+            background: rgba(242, 199, 68, 0.08) !important;
         }
     </style>
 </head>

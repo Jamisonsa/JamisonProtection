@@ -103,21 +103,7 @@
             border-radius: 10px;
             margin-top: 20px;
         }
-        .fc {
-            background: #1f1f1f;
-            color: white;
-        }
-        .fc-toolbar-title {
-            color: #f2c744;
-        }
-        .fc-button {
-            background: #e63946 !important;
-            border: none !important;
-            color: white !important;
-        }
-        .fc-button:hover {
-            background: #c5303d !important;
-        }
+
         .modal {
             display: none;
             position: fixed;
@@ -149,6 +135,53 @@
 
         .close:hover {
             color: white;
+        }
+        .fc {
+            background: #1f1f1f;
+            color: white;
+        }
+
+        .fc-toolbar-title {
+            color: #f2c744;
+        }
+
+        .fc-button {
+            background: #e63946 !important;
+            border: none !important;
+            color: white !important;
+        }
+
+        .fc-button:hover {
+            background: #c5303d !important;
+        }
+
+        .fc-col-header-cell {
+            background: #2a2a2a !important;
+        }
+
+        .fc-col-header-cell-cushion {
+            color: #ffffff !important;
+            text-decoration: none !important;
+            font-weight: 700 !important;
+            font-size: 14px;
+            padding: 8px 4px;
+            display: inline-block;
+        }
+
+        .fc-daygrid-day-number {
+            color: #f0f0f0 !important;
+            text-decoration: none !important;
+        }
+
+        .fc-theme-standard th,
+        .fc-theme-standard td,
+        .fc-scrollgrid,
+        .fc-scrollgrid table {
+            border-color: #555 !important;
+        }
+
+        .fc-day-today {
+            background: rgba(242, 199, 68, 0.08) !important;
         }
     </style>
 </head>
@@ -433,11 +466,7 @@
             alert('Error updating shift: ' + err.message);
         }
     }
-    window.onclick = function(event) {
-        const modal = document.getElementById("shiftModal");
-        if (event.target === modal) {
-            closeModal();        }
-    };
+
     async function submitHours(event) {
         event.preventDefault();
 
