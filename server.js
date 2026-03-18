@@ -1,6 +1,7 @@
 // server.js
 process.env.NODE_ENV = 'production';
 require('dotenv').config();
+const nodemailer = require('nodemailer');
 
 // ────── NodeMailer Config ──────
 const transporter = nodemailer.createTransport({
@@ -226,7 +227,6 @@ async function notifyUsersOfNewShift(shift) {
         console.error('SMS notify error:', err?.message || err);
     }
 }
-const nodemailer = require('nodemailer');
 
 // Owner temporarily views as worker
 app.post('/api/switch-to-worker', requireLogin, (req, res) => {
