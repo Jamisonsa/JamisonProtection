@@ -628,27 +628,31 @@ app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
                 id: shift._id,
                 title: `Available: ${shift.location}`,
                 start: `${shift.date}T${shift.startTime}`,
-                date: shift.date,
-                startTime: shift.startTime,
-                expectedEnd: shift.expectedEnd || '',
-                location: shift.location || '',
-                position: shift.position || '',
-                notes: shift.notes || '',
-                status: shift.status,
-                type: 'available'
+                extendedProps: {
+                    date: shift.date,
+                    startTime: shift.startTime,
+                    expectedEnd: shift.expectedEnd || '',
+                    location: shift.location || '',
+                    position: shift.position || '',
+                    notes: shift.notes || '',
+                    status: shift.status,
+                    type: 'available'
+                }
             })),
             ...myShifts.map(shift => ({
                 id: shift._id,
                 title: `My Shift: ${shift.location}`,
                 start: `${shift.date}T${shift.startTime}`,
-                date: shift.date,
-                startTime: shift.startTime,
-                expectedEnd: shift.expectedEnd || '',
-                location: shift.location || '',
-                position: shift.position || '',
-                notes: shift.notes || '',
-                status: shift.status,
-                type: 'claimed'
+                extendedProps: {
+                    date: shift.date,
+                    startTime: shift.startTime,
+                    expectedEnd: shift.expectedEnd || '',
+                    location: shift.location || '',
+                    position: shift.position || '',
+                    notes: shift.notes || '',
+                    status: shift.status,
+                    type: 'claimed'
+                }
             }))
         ];
 
@@ -790,14 +794,16 @@ app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
                 ? `${shift.location} — ${shift.claimedBy}`
                 : `${shift.location} — Open`,
             start: `${shift.date}T${shift.startTime}`,
-            date: shift.date,
-            startTime: shift.startTime,
-            expectedEnd: shift.expectedEnd || '',
-            location: shift.location || '',
-            position: shift.position || '',
-            notes: shift.notes || '',
-            status: shift.status,
-            claimedBy: shift.claimedBy || null
+            extendedProps: {
+                date: shift.date,
+                startTime: shift.startTime,
+                expectedEnd: shift.expectedEnd || '',
+                location: shift.location || '',
+                position: shift.position || '',
+                notes: shift.notes || '',
+                status: shift.status,
+                claimedBy: shift.claimedBy || null
+            }
         }));
 
         res.json(events);

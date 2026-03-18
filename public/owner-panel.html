@@ -760,7 +760,8 @@
             const res = await fetch('/api/owner-calendar', { credentials: 'include' });
 
             if (res.status === 401) {
-                return location.href = 'login.html';
+                location.href = 'login.html';
+                return;
             }
 
             const events = await res.json();
@@ -774,7 +775,7 @@
                 initialView: 'dayGridMonth',
                 height: 'auto',
                 events,
-                eventDidMount: function(info) {
+                eventDidMount(info) {
                     const status = info.event.extendedProps.status;
                     const claimedBy = info.event.extendedProps.claimedBy;
 
@@ -790,18 +791,27 @@
                         info.el.style.borderColor = '#e63946';
                     }
                 },
-                eventClick: function(info) {
+                eventClick(info) {
                     const e = info.event;
+                    const p = e.extendedProps;
+
+                    const start = e.start;
+                    const formattedDate = p.date || 'N/A';
+                    const formattedTime = start
+                        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        : (p.startTime || 'N/A');
+
                     alert(
-                        `${e.title}\n\n` +
-                        `Date: ${e.extendedProps.date}\n` +
-                        `Start Time: ${e.extendedProps.startTime}\n` +
-                        `Expected End: ${e.extendedProps.expectedEnd || 'N/A'}\n` +
-                        `Location: ${e.extendedProps.location || 'N/A'}\n` +
-                        `Position: ${e.extendedProps.position || 'N/A'}\n` +
-                        `Status: ${e.extendedProps.status || 'N/A'}\n` +
-                        `Claimed By: ${e.extendedProps.claimedBy || 'Open'}\n` +
-                        `Notes: ${e.extendedProps.notes || 'None'}`
+                        `${e.title}
+
+Date: ${formattedDate}
+Start Time: ${formattedTime}
+Expected End: ${p.expectedEnd || 'N/A'}
+Location: ${p.location || 'N/A'}
+Position: ${p.position || 'N/A'}
+Status: ${p.status || 'N/A'}
+Claimed By: ${p.claimedBy || 'Open'}
+Notes: ${p.notes || 'None'}`
                     );
                 }
             });

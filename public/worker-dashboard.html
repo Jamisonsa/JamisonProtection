@@ -354,14 +354,12 @@
         selectedShiftId = e.id;
         selectedShiftType = p.type || 'available';
 
-        const start = e.start;
-        const formattedDate = start
-        ? start.toLocaleDateString('en-CA')
-        : 'N/A';
+            const start = e.start;
 
-        const formattedTime = start
-        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-        : 'N/A';
+            const formattedDate = p.date || "N/A";
+            const formattedTime = start
+                ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                : (p.startTime || "N/A");
 
         document.getElementById('modalTitle').textContent = e.title;
         document.getElementById('modalDate').textContent = formattedDate;
