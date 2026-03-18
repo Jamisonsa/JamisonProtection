@@ -354,9 +354,18 @@
                     selectedShiftId = e.id;
                     selectedShiftType = p.type || 'available';
 
+                    const start = e.start;
+                    const formattedDate = start
+                        ? start.toLocaleDateString('en-CA')
+                        : "N/A";
+
+                    const formattedTime = start
+                        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                        : "N/A";
+
                     document.getElementById("modalTitle").textContent = e.title;
-                    document.getElementById("modalDate").textContent = p.date || "N/A";
-                    document.getElementById("modalStart").textContent = p.startTime || "N/A";
+                    document.getElementById("modalDate").textContent = formattedDate;
+                    document.getElementById("modalStart").textContent = formattedTime;
                     document.getElementById("modalEnd").textContent = p.expectedEnd || "N/A";
                     document.getElementById("modalLocation").textContent = p.location || "N/A";
                     document.getElementById("modalPosition").textContent = p.position || "N/A";
@@ -374,7 +383,6 @@
 
                     document.getElementById("shiftModal").style.display = "block";
                 }
-            });
 
             calendar.render();
         } catch (err) {
