@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Worker Dashboard | Jamison Protection</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -16,6 +20,7 @@
             color: white;
             padding: 20px;
             text-align: center;
+            position: relative;
         }
         .logout-btn {
             position: absolute;
@@ -28,20 +33,28 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        main {
+            max-width: 1100px;
+            margin: auto;
+            padding: 25px;
+        }
         form {
             background: #1f1f1f;
             padding: 20px;
-            margin-top: 40px;
+            margin-top: 30px;
             border-left: 5px solid #e63946;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border-radius: 8px;
         }
-        input {
+        input, select, textarea {
             width: 100%;
             padding: 10px;
             background: #2a2a2a;
             color: white;
             border: none;
             margin: 10px 0;
+            border-radius: 4px;
+            box-sizing: border-box;
         }
         button {
             background: #e63946;
@@ -56,45 +69,15 @@
             margin: 15px 0;
             padding: 15px;
             border-left: 5px solid #e63946;
-        }
-        #securityLogForm {
-            background: #1f1f1f;
-            padding: 15px;
             border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        #securityLogForm input,
-        #securityLogForm select,
-        #securityLogForm textarea {
-            width: 100%;
-            margin: 4px 0;
-            padding: 8px;
-            border-radius: 4px;
-            border: none;
-            outline: none;
-        }
-
-        #securityLogForm button {
-            background: #e63946;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 10px 16px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        #securityLogForm button:hover {
-            background: #c5303d;
         }
         #securityLogFilter input, #securityLogFilter button {
             margin: 5px;
             padding: 8px;
             border-radius: 5px;
             border: none;
+            width: auto;
         }
-
         #securityLogFilter button {
             background: #e63946;
             color: white;
@@ -102,15 +85,10 @@
             font-weight: bold;
             transition: 0.2s;
         }
-
         #securityLogFilter button:hover {
             background: #c5303d;
         }
         #logHoursForm {
-            background: #1f1f1f;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 30px;
             border-left: 5px solid #4CAF50;
         }
         #logHoursForm button {
@@ -119,16 +97,36 @@
         #logHoursForm button:hover {
             background: #3e8e41;
         }
-
+        #shiftCalendar {
+            background: #1f1f1f;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .fc {
+            background: #1f1f1f;
+            color: white;
+        }
+        .fc-toolbar-title {
+            color: #f2c744;
+        }
+        .fc-button {
+            background: #e63946 !important;
+            border: none !important;
+            color: white !important;
+        }
+        .fc-button:hover {
+            background: #c5303d !important;
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1 id="welcomeMsg">Worker Dashboard</h1>
-        <button class="logout-btn" onclick="logout()">Logout</button>
-        <button onclick="switchToOwner()">Switch to Owner View</button>
-    </header>
+<header>
+    <h1 id="welcomeMsg">Worker Dashboard</h1>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <button onclick="switchToOwner()">Switch to Owner View</button>
+</header>
 
 <main>
     <h2>Available Shifts</h2>
@@ -136,29 +134,35 @@
 
     <h2>My Shifts</h2>
     <div id="myShiftList"></div>
+
+    <hr>
+
+    <h2>Shift Calendar</h2>
+    <div id="shiftCalendar"></div>
+
     <h2>Log Your Hours</h2>
     <form id="logHoursForm" onsubmit="submitHours(event)">
         <label>Date:</label>
-        <input type="date" id="logDate" required><br><br>
+        <input type="date" id="hoursDate" required>
 
         <label>Start Time:</label>
-        <input type="time" id="logStart" required><br><br>
+        <input type="time" id="hoursStart" required>
 
         <label>End Time:</label>
-        <input type="time" id="logEnd" required><br><br>
+        <input type="time" id="hoursEnd" required>
 
         <label>Location:</label>
-        <select id="logLocation" required>
+        <select id="hoursLocation" required>
             <option value="John Carroll School">John Carroll School</option>
-        </select><br><br>
+        </select>
 
         <label>Work Position:</label>
-        <input type="text" id="logPosition" placeholder="e.g. Front Desk" required><br><br>
+        <input type="text" id="hoursPosition" placeholder="e.g. Front Desk" required>
 
         <label>Hours Worked:</label>
-        <input type="number" id="logHours" step="0.1" placeholder="e.g. 5.5" required><br><br>
+        <input type="number" id="hoursWorked" step="0.1" placeholder="e.g. 5.5" required>
 
-        <button type="submit" class="submit-btn">Submit Hours</button>
+        <button type="submit">Submit Hours</button>
     </form>
 
     <hr>
@@ -166,23 +170,23 @@
     <h2>Daily Security Log</h2>
     <form id="securityLogForm" onsubmit="submitSecurityLog(event)">
         <label>Date:</label>
-        <input type="date" id="logDate" required><br><br>
+        <input type="date" id="securityDate" required>
 
         <label>Time:</label>
-        <input type="time" id="logTime" required><br><br>
+        <input type="time" id="securityTime" required>
 
         <label>Location:</label>
-        <select id="logLocation" required>
+        <select id="securityLocation" required>
             <option value="John Carroll School">John Carroll School</option>
-        </select><br><br>
+        </select>
 
-        <label>Description:</label><br>
-        <textarea id="logDescription" placeholder="Describe the event or observation..." required></textarea><br><br>
+        <label>Description:</label>
+        <textarea id="securityDescription" placeholder="Describe the event or observation..." required></textarea>
 
         <label>Worker Initials:</label>
-        <input type="text" id="logInitials" maxlength="3" placeholder="e.g. FJ" required><br><br>
+        <input type="text" id="securityInitials" maxlength="3" placeholder="e.g. FJ" required>
 
-        <button type="submit" class="submit-btn">Submit Log</button>
+        <button type="submit">Submit Log</button>
     </form>
 
     <hr>
@@ -204,259 +208,316 @@
     <div id="securityLogsContainer">
         <p>Loading logs...</p>
     </div>
+
     <hr>
+
     <h2>Change Password</h2>
     <form id="changePasswordForm" onsubmit="changePassword(event)">
         <label>Old Password:</label>
-        <input type="password" id="oldPassword" required><br><br>
+        <input type="password" id="oldPassword" required>
 
         <label>New Password:</label>
-        <input type="password" id="newPassword" required><br><br>
+        <input type="password" id="newPassword" required>
 
         <button type="submit">Update Password</button>
     </form>
-
-
 </main>
 
 <script>
-        async function loadShifts() {
+    let calendar;
+
+    async function loadShifts() {
         const res = await fetch('/api/shifts', { credentials: 'include' });
         if (res.status === 401) return (location.href = 'login.html');
+
         const shifts = await res.json();
         const available = shifts.filter(s => s.status !== 'claimed');
 
         const container = document.getElementById('shiftList');
         container.innerHTML = available.length
-        ? available.map(s => `
+            ? available.map(s => `
                 <div class="shift">
-                    <strong>${s.date} at ${s.startTime}</strong><br>
+                    <strong>${s.date} at ${s.startTime || 'N/A'}</strong><br>
+                    Ends: ${s.expectedEnd || 'N/A'}<br>
                     Location: ${s.location}<br>
+                    Position: ${s.position || 'Unassigned'}<br>
                     Notes: ${s.notes || 'None'}<br>
                     Status: ${s.status}<br>
                     <button onclick="claimShift('${s._id}')">Claim</button>
                 </div>
             `).join('')
-        : '<p>No available shifts at this time.</p>';
+            : '<p>No available shifts at this time.</p>';
     }
 
-        async function loadMyShifts() {
+    async function loadMyShifts() {
         const res = await fetch('/api/my-shifts', { credentials: 'include' });
         if (res.status === 401) return (location.href = 'login.html');
+
         const shifts = await res.json();
 
         const container = document.getElementById('myShiftList');
         container.innerHTML = shifts.length
-        ? shifts.map(s => `
+            ? shifts.map(s => `
                 <div class="shift">
-                    <strong>${s.date} at ${s.time}</strong><br>
+                    <strong>${s.date} at ${s.startTime || 'N/A'}</strong><br>
+                    Ends: ${s.expectedEnd || 'N/A'}<br>
                     Location: ${s.location}<br>
+                    Position: ${s.position || 'Unassigned'}<br>
                     Notes: ${s.notes || 'None'}<br>
                     <button onclick="dropShift('${s._id}')">Drop Shift</button>
                 </div>
             `).join('')
-        : '<p>You have no claimed shifts.</p>';
+            : '<p>You have no claimed shifts.</p>';
     }
-        async function submitHours(event) {
-            event.preventDefault();
 
-            const log = {
-                date: document.getElementById('logDate').value,
-                startTime: document.getElementById('logStart').value,
-                endTime: document.getElementById('logEnd').value,
-                location: document.getElementById('logLocation').value,
-                position: document.getElementById('logPosition').value,
-                hours: document.getElementById('logHours').value
-            };
+    async function loadShiftCalendar() {
+        try {
+            const res = await fetch('/api/worker-calendar', { credentials: 'include' });
+            if (res.status === 401) return location.href = 'login.html';
 
-            const res = await fetch('/api/log-hours', {
+            const events = await res.json();
+            const calendarEl = document.getElementById('shiftCalendar');
+
+            if (calendar) {
+                calendar.destroy();
+            }
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 'auto',
+                events,
+                eventDidMount(info) {
+                    if (info.event.extendedProps.type === 'claimed') {
+                        info.el.style.backgroundColor = '#2e7d32';
+                        info.el.style.borderColor = '#2e7d32';
+                    } else {
+                        info.el.style.backgroundColor = '#e63946';
+                        info.el.style.borderColor = '#e63946';
+                    }
+                },
+                eventClick(info) {
+                    const e = info.event;
+                    alert(
+                        `${e.title}\n\n` +
+                        `Date: ${e.extendedProps.date}\n` +
+                        `Start Time: ${e.extendedProps.startTime}\n` +
+                        `Expected End: ${e.extendedProps.expectedEnd || 'N/A'}\n` +
+                        `Location: ${e.extendedProps.location || 'N/A'}\n` +
+                        `Position: ${e.extendedProps.position || 'N/A'}\n` +
+                        `Notes: ${e.extendedProps.notes || 'None'}`
+                    );
+                }
+            });
+
+            calendar.render();
+        } catch (err) {
+            console.error('Failed to load shift calendar:', err);
+        }
+    }
+
+    async function submitHours(event) {
+        event.preventDefault();
+
+        const log = {
+            date: document.getElementById('hoursDate').value,
+            startTime: document.getElementById('hoursStart').value,
+            endTime: document.getElementById('hoursEnd').value,
+            location: document.getElementById('hoursLocation').value,
+            position: document.getElementById('hoursPosition').value,
+            hours: document.getElementById('hoursWorked').value
+        };
+
+        const res = await fetch('/api/log-hours', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(log)
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        document.getElementById('logHoursForm').reset();
+    }
+
+    async function submitSecurityLog(event) {
+        event.preventDefault();
+
+        const log = {
+            date: document.getElementById('securityDate').value,
+            time: document.getElementById('securityTime').value,
+            location: document.getElementById('securityLocation').value,
+            description: document.getElementById('securityDescription').value,
+            initials: document.getElementById('securityInitials').value
+        };
+
+        const res = await fetch('/api/security-logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(log)
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        document.getElementById('securityLogForm').reset();
+        loadSecurityLogs();
+    }
+
+    async function loadSecurityLogs(date = '', initials = '') {
+        try {
+            let url = '/api/security-logs';
+            const params = [];
+            if (date) params.push(`date=${encodeURIComponent(date)}`);
+            if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
+            if (params.length) url += '?' + params.join('&');
+
+            const res = await fetch(url, { credentials: 'include' });
+            const logs = await res.json();
+
+            const container = document.getElementById('securityLogsContainer');
+            if (!logs.length) {
+                container.innerHTML = '<p>No logs found for selected criteria.</p>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => `
+                <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
+                    <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
+                    ${log.description}<br>
+                    <small>Initials: ${log.initials} | Submitted by: ${log.submittedBy}</small>
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Failed to load security logs:', err);
+        }
+    }
+
+    async function changePassword(event) {
+        event.preventDefault();
+
+        const oldPassword = document.getElementById('oldPassword').value.trim();
+        const newPassword = document.getElementById('newPassword').value.trim();
+
+        if (!oldPassword || !newPassword) {
+            return alert('Please enter both old and new passwords.');
+        }
+
+        try {
+            const res = await fetch('/api/change-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify(log)
+                body: JSON.stringify({ oldPassword, newPassword })
             });
 
             const data = await res.json();
             alert(data.message);
-            document.getElementById('logHoursForm').reset();
-        }
-        async function submitSecurityLog(event) {
-            event.preventDefault();
 
-            const log = {
-                date: document.getElementById('logDate').value,
-                time: document.getElementById('logTime').value,
-                location: document.getElementById('logLocation').value,
-                description: document.getElementById('logDescription').value,
-                initials: document.getElementById('logInitials').value
-            };
-
-            const res = await fetch('/api/security-logs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(log)
-            });
-
-            const data = await res.json();
-            alert(data.message);
-            document.getElementById('securityLogForm').reset();
-            loadSecurityLogs();
-        }
-
-        async function loadSecurityLogs(date = '', initials = '') {
-            try {
-                let url = '/api/security-logs';
-                const params = [];
-                if (date) params.push(`date=${encodeURIComponent(date)}`);
-                if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
-                if (params.length) url += '?' + params.join('&');
-
-                const res = await fetch(url, { credentials: 'include' });
-                const logs = await res.json();
-
-                const container = document.getElementById('securityLogsContainer');
-                if (!logs.length) {
-                    container.innerHTML = '<p>No logs found for selected criteria.</p>';
-                    return;
-                }
-
-                container.innerHTML = logs.map(log => `
-      <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
-        <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
-        ${log.description}<br>
-        <small>Initials: ${log.initials} | Submitted by: ${log.submittedBy}</small>
-      </div>
-    `).join('');
-            } catch (err) {
-                console.error('Failed to load security logs:', err);
+            if (res.ok) {
+                document.getElementById('changePasswordForm').reset();
             }
+        } catch (err) {
+            alert('Error: ' + err.message);
         }
-        async function changePassword(event) {
-            event.preventDefault();
+    }
 
-            const oldPassword = document.getElementById('oldPassword').value.trim();
-            const newPassword = document.getElementById('newPassword').value.trim();
+    function filterSecurityLogs() {
+        const date = document.getElementById('filterDate').value;
+        const initials = document.getElementById('filterInitials').value;
+        loadSecurityLogs(date, initials);
+    }
 
-            if (!oldPassword || !newPassword) {
-                return alert('Please enter both old and new passwords.');
-            }
+    function clearSecurityFilters() {
+        document.getElementById('filterDate').value = '';
+        document.getElementById('filterInitials').value = '';
+        loadSecurityLogs();
+    }
 
-            try {
-                const res = await fetch('/api/change-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ oldPassword, newPassword })
-                });
+    function exportSecurityLogs() {
+        const date = document.getElementById('filterDate').value;
+        const initials = document.getElementById('filterInitials').value;
 
-                const data = await res.json();
-                alert(data.message);
+        let url = '/api/security-logs?format=csv';
+        if (date) url += `&date=${encodeURIComponent(date)}`;
+        if (initials) url += `&initials=${encodeURIComponent(initials)}`;
 
-                if (res.ok) {
-                    document.getElementById('changePasswordForm').reset();
-                }
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
+        window.open(url, '_blank');
+    }
 
-
-        // Load logs automatically on page load
-        document.addEventListener('DOMContentLoaded', loadSecurityLogs);
-        function filterSecurityLogs() {
-            const date = document.getElementById('filterDate').value;
-            const initials = document.getElementById('filterInitials').value;
-            loadSecurityLogs(date, initials);
-        }
-
-        function clearSecurityFilters() {
-            document.getElementById('filterDate').value = '';
-            document.getElementById('filterInitials').value = '';
-            loadSecurityLogs();
-        }
-
-        function exportSecurityLogs() {
-            const date = document.getElementById('filterDate').value;
-            const initials = document.getElementById('filterInitials').value;
-
-            let url = '/api/security-logs?format=csv';
-            if (date) url += `&date=${encodeURIComponent(date)}`;
-            if (initials) url += `&initials=${encodeURIComponent(initials)}`;
-
-            window.open(url, '_blank');
-        }
-
-        async function claimShift(id) {
+    async function claimShift(id) {
         const res = await fetch('/api/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ shiftId: id })
-    });
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ shiftId: id })
+        });
+
         const data = await res.json();
         alert(data.message);
         await loadShifts();
         await loadMyShifts();
+        await loadShiftCalendar();
     }
 
-        async function dropShift(shiftId) {
+    async function dropShift(shiftId) {
         const res = await fetch('/api/drop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ shiftId })
-    });
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ shiftId })
+        });
+
         const data = await res.json();
         alert(data.message);
         await loadShifts();
         await loadMyShifts();
+        await loadShiftCalendar();
     }
 
-        async function logout() {
+    async function logout() {
         try {
-        const res = await fetch('/logout', {
-        method: 'POST',
-        credentials: 'include'
-    });
-        if (res.ok) {
-        window.location.href = 'login.html';
-    } else {
-        alert('Logout failed.');
-    }
-    } catch (err) {
-        alert('Error logging out: ' + err.message);
-    }
+            const res = await fetch('/logout', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                window.location.href = 'login.html';
+            } else {
+                alert('Logout failed.');
+            }
+        } catch (err) {
+            alert('Error logging out: ' + err.message);
+        }
     }
 
-        async function switchToOwner() {
+    async function switchToOwner() {
         try {
-        const res = await fetch('/api/switch-to-owner', {
-        method: 'POST',
-        credentials: 'include'
-    });
-        if (res.ok) {
-        window.location.href = 'owner-panel.html';
-    } else {
-        const data = await res.json();
-        alert(data.message || 'Only owners can switch to owner view.');
-    }
-    } catch (err) {
-        alert('Error switching view: ' + err.message);
-    }
+            const res = await fetch('/api/switch-to-owner', {
+                method: 'POST',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                window.location.href = 'owner-panel.html';
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Only owners can switch to owner view.');
+            }
+        } catch (err) {
+            alert('Error switching view: ' + err.message);
+        }
     }
 
-        // ✅ Fixed session check — safely loads shifts after login
-        fetch('/api/session-debug', { credentials: 'include' })
+    fetch('/api/session-debug', { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
-        if (!data.user) return (location.href = 'login.html');
-        console.log('Logged in as:', data.user);
-        loadShifts();
-        loadMyShifts();
-    })
+            if (!data.user) return (location.href = 'login.html');
+            console.log('Logged in as:', data.user);
+            loadShifts();
+            loadMyShifts();
+            loadShiftCalendar();
+            loadSecurityLogs();
+        })
         .catch(err => console.error('Session check failed:', err));
-
 </script>
 
 </body>
