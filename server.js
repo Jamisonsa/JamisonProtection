@@ -14,7 +14,7 @@ async function notifyUsersOfNewShift(shift) {
 
         // Get all owners + workers who opted in and have a valid phone
         const recipients = await User.find({
-            role: { $in: ['owner', 'worker'] },
+            role: { $in: ['owner', 'worker', 'admin'] },
             notifySms: true,
             phone: { $ne: null }
         }, { phone: 1, username: 1 });
@@ -467,7 +467,7 @@ app.post('/api/change-password', requireLogin, async (req, res) => {
 app.post('/api/security-logs', requireLogin, async (req, res) => {
     try {
         const { date, time, location, description, initials } = req.body;
-        const submittedBy = req.session.user;
+        const submittedBy = req.session.user.username;
 
         const newLog = new SecurityLog({
             date,
@@ -537,7 +537,7 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     });
     await shift.save();
 
-    console.log(`✅ New shift posted by ${req.session.user}: ${date} ${startTime} at ${location}`);
+    console.log(`✅ New shift posted by ${req.session.user.username}: ${date} ${startTime} at ${location}`);
 
     notifyUsersOfNewShift(shift).catch(() => {});
     res.json({ message: 'Shift posted' });
@@ -553,7 +553,7 @@ app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
     if (!shift) return res.status(404).json({ message: 'Shift not found' });
     if (shift.claimedBy) return res.status(400).json({ message: 'Shift already claimed' });
 
-    shift.claimedBy = req.session.user;
+    shift.claimedBy = req.session.user.username;
     shift.status = 'claimed';
     shift.droppedBy = null;
     shift.dropTime = null;
@@ -569,11 +569,11 @@ app.post('/api/drop', requireLogin, isWorker, async (req, res) => {
     const { shiftId } = req.body;
     const shift = await Shift.findById(shiftId);
     if (!shift) return res.status(404).json({ message: 'Shift not found' });
-    if (shift.claimedBy !== req.session.user)
+    if (shift.claimedBy !== req.session.user.username)
         return res.status(403).json({ message: 'You can only drop your own shifts' });
 
     shift.status = 'dropped';
-    shift.droppedBy = req.session.user;
+    shift.droppedBy = req.session.user.username;
     shift.claimedBy = null;
     shift.dropTime = new Date();
     // keep alertSent as-is; 24h checker will set it when it fires
@@ -596,7 +596,53 @@ app.post('/api/repost-shift', requireLogin, isOwner, async (req, res) => {
 
     res.json({ message: 'Shift reposted as available' });
 });
+app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
+    try {
+        const availableShifts = await Shift.find({
+            claimedBy: null,
+            status: { $in: ['available', 'dropped'] }
+        }).sort({ date: 1, startTime: 1 });
 
+        const myShifts = await Shift.find({
+            claimedBy: req.session.user.username,
+            status: 'claimed'
+        }).sort({ date: 1, startTime: 1 });
+
+        const events = [
+            ...availableShifts.map(shift => ({
+                id: shift._id,
+                title: `Available: ${shift.location}`,
+                start: `${shift.date}T${shift.startTime}`,
+                date: shift.date,
+                startTime: shift.startTime,
+                expectedEnd: shift.expectedEnd || '',
+                location: shift.location || '',
+                position: shift.position || '',
+                notes: shift.notes || '',
+                status: shift.status,
+                type: 'available'
+            })),
+            ...myShifts.map(shift => ({
+                id: shift._id,
+                title: `My Shift: ${shift.location}`,
+                start: `${shift.date}T${shift.startTime}`,
+                date: shift.date,
+                startTime: shift.startTime,
+                expectedEnd: shift.expectedEnd || '',
+                location: shift.location || '',
+                position: shift.position || '',
+                notes: shift.notes || '',
+                status: shift.status,
+                type: 'claimed'
+            }))
+        ];
+
+        res.json(events);
+    } catch (err) {
+        console.error('Error loading worker calendar:', err);
+        res.status(500).json({ message: 'Failed to load worker calendar.' });
+    }
+});
 // ────── Log Hours ──────
 // ─── Worker Log Hours ───
 app.post('/api/log-hours', requireLogin, async (req, res) => {
@@ -719,7 +765,32 @@ app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
     res.send(html);
   });
 });
+app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
+    try {
+        const shifts = await Shift.find().sort({ date: 1, startTime: 1 });
 
+        const events = shifts.map(shift => ({
+            id: shift._id,
+            title: shift.claimedBy
+                ? `${shift.location} — ${shift.claimedBy}`
+                : `${shift.location} — Open`,
+            start: `${shift.date}T${shift.startTime}`,
+            date: shift.date,
+            startTime: shift.startTime,
+            expectedEnd: shift.expectedEnd || '',
+            location: shift.location || '',
+            position: shift.position || '',
+            notes: shift.notes || '',
+            status: shift.status,
+            claimedBy: shift.claimedBy || null
+        }));
+
+        res.json(events);
+    } catch (err) {
+        console.error('Error loading owner calendar:', err);
+        res.status(500).json({ message: 'Failed to load owner calendar.' });
+    }
+});
 app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
   return res.sendStatus(200);
 });
@@ -736,41 +807,18 @@ app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
     const shifts = await Shift.find({
         claimedBy: null,
         status: { $in: ['available', 'dropped'] }
-    }).sort({ date: 1, time: 1 });
+    }).sort({ date: 1, startTime: 1 });
+
     console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
-
     res.json(shifts);
-});
-app.post('/api/log-hours', requireLogin, async (req, res) => {
-    try {
-        const { date, startTime, endTime, location, position, hours } = req.body;
-        const user = req.session.user;
-
-        const newLog = new Log({
-            user,
-            date,
-            startTime,
-            endTime,
-            location,
-            position,
-            hours
-        });
-
-        await newLog.save();
-        console.log(`🕒 Hours logged by ${user}: ${hours} hrs on ${date} (${position})`);
-        res.json({ message: 'Hours logged successfully' });
-    } catch (err) {
-        console.error('Error logging hours:', err);
-        res.status(500).json({ message: 'Failed to log hours' });
-    }
 });
 
 // Current user's claimed shifts (to show Drop buttons)
 app.get('/api/my-shifts', requireLogin, isWorker, async (req, res) => {
     const shifts = await Shift.find({
-        claimedBy: req.session.user,
+        claimedBy: req.session.user.username,
         status: 'claimed'
-    }).sort({ date: 1, time: 1 });
+    }).sort({ date: 1, startTime: 1 });
     res.json(shifts);
 });
 

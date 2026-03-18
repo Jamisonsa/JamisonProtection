@@ -39,6 +39,15 @@
             padding: 20px;
         }
 
+        #searchBox {
+            padding: 8px;
+            margin-bottom: 12px;
+            width: 260px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -51,6 +60,7 @@
             padding: 12px;
             border-bottom: 1px solid #333;
             text-align: left;
+            vertical-align: top;
         }
 
         th {
@@ -70,6 +80,12 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .hire-btn {
+            background: #2e7d32;
         }
 
         .link {
@@ -84,12 +100,27 @@
         .status {
             font-size: 13px;
             color: #aaa;
+            line-height: 1.5;
         }
-        /* Highlight scheduled interviews */
+
         tr.scheduled td {
             background-color: #18392b;
         }
 
+        select {
+            padding: 6px;
+            border-radius: 4px;
+            border: none;
+            outline: none;
+            margin-top: 6px;
+        }
+
+        .notes-box {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #ddd;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -99,7 +130,12 @@
 </header>
 
 <main>
-    <input type="text" id="searchBox" placeholder="Search name or email..." oninput="filterInterviews()" style="padding:8px; margin-bottom:10px; width:250px; border-radius:5px;">
+    <input
+            type="text"
+            id="searchBox"
+            placeholder="Search name or email..."
+            oninput="filterInterviews()"
+    >
 
     <table id="interviewTable">
         <thead>
@@ -108,8 +144,8 @@
             <th>Email</th>
             <th>Position</th>
             <th>Submitted</th>
-            <th>Résumé</th>
-            <th>Cover Letter</th>
+            <th>Résumé File</th>
+            <th>Cover File</th>
             <th>Interview / Status</th>
             <th>Actions / Notes</th>
         </tr>
@@ -119,125 +155,150 @@
         </tbody>
     </table>
 </main>
+
 <script>
     function goBack() {
         window.location.href = 'owner-panel.html';
     }
 
     async function loadInterviews() {
-        const res = await fetch('/api/interviews', { credentials: 'include' });
-        const data = await res.json();
-        const tbody = document.getElementById('interviewBody');
+        try {
+            const res = await fetch('/api/interviews', { credentials: 'include' });
 
-        if (!data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No interview submissions yet.</td></tr>';
-            return;
-        }
+            if (res.status === 401) {
+                window.location.href = 'login.html';
+                return;
+            }
 
-        tbody.innerHTML = data.map(i => {
-            const resumeIsPdf = i.resumeMimeType === 'application/pdf';
-            const coverIsPdf = i.coverMimeType === 'application/pdf';
+            const data = await res.json();
+            const tbody = document.getElementById('interviewBody');
 
-            return `
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No interview submissions yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(i => {
+                const resumeIsPdf = i.resumeMimeType === 'application/pdf';
+                const coverIsPdf = i.coverMimeType === 'application/pdf';
+
+                return `
 <tr class="${i.interviewTime ? 'scheduled' : ''}">
-  <td>${i.name}</td>
-  <td>${i.email}</td>
-  <td>${i.position || '—'}</td>
-  <td>${new Date(i.submittedAt).toLocaleString()}</td>
+    <td>${escapeHtml(i.name || '—')}</td>
+    <td>${escapeHtml(i.email || '—')}</td>
+    <td>${escapeHtml(i.position || '—')}</td>
+    <td>${i.submittedAt ? new Date(i.submittedAt).toLocaleString() : '—'}</td>
 
-  <td>
-    ${i.resumePath
-                ? `
-          ${resumeIsPdf ? `<a href="/api/interviews/file/${i._id}?type=resume&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
-          <a href="/api/interviews/file/${i._id}?type=resume" class="link">Download</a>
-        `
-                : '—'}
-  </td>
+    <td>
+        ${i.resumePath ? `
+            ${resumeIsPdf ? `<a href="/api/interviews/file/${i._id}?type=resume&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
+            <a href="/api/interviews/file/${i._id}?type=resume" class="link">Download</a>
+        ` : '—'}
+    </td>
 
-  <td>
-    ${i.coverPath
-                ? `
-          ${coverIsPdf ? `<a href="/api/interviews/file/${i._id}?type=cover&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
-          <a href="/api/interviews/file/${i._id}?type=cover" class="link">Download</a>
-        `
-                : '—'}
-  </td>
+    <td>
+        ${i.coverPath ? `
+            ${coverIsPdf ? `<a href="/api/interviews/file/${i._id}?type=cover&mode=preview" target="_blank" class="link">Preview</a> | ` : ''}
+            <a href="/api/interviews/file/${i._id}?type=cover" class="link">Download</a>
+        ` : '—'}
+    </td>
 
-  <td>
-    ${i.interviewTime
-                ? `<span class="status">📅 ${i.interviewTime}<br>
-           🔗 <a href="${i.zoomLink}" target="_blank" class="link">Join</a><br>
-           <button class="action-btn" onclick="navigator.clipboard.writeText('${i.zoomLink}')">Copy Link</button>
-           </span>`
-                : '<span class="status">Not scheduled</span>'}
+    <td>
+        ${i.interviewTime ? `
+            <span class="status">
+                📅 ${escapeHtml(i.interviewTime)}<br>
+                ${i.zoomLink ? `🔗 <a href="${escapeAttr(i.zoomLink)}" target="_blank" class="link">Join</a><br>` : ''}
+                ${i.zoomLink ? `<button class="action-btn" onclick="copyLink(${JSON.stringify(i.zoomLink)})">Copy Link</button>` : ''}
+            </span>
+        ` : '<span class="status">Not scheduled</span>'}
 
-    <div style="margin-top:8px;">
-      <select onchange="updateStatus('${i._id}', this.value)" style="padding:6px; border-radius:4px;">
-        <option value="New" ${i.status === 'New' ? 'selected' : ''}>New</option>
-        <option value="Reviewed" ${i.status === 'Reviewed' ? 'selected' : ''}>Reviewed</option>
-        <option value="Interview Scheduled" ${i.status === 'Interview Scheduled' ? 'selected' : ''}>Interview Scheduled</option>
-        <option value="Rejected" ${i.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
-        <option value="Hired" ${i.status === 'Hired' ? 'selected' : ''}>Hired</option>
-      </select>
-      <div class="status" style="margin-top:4px;">Status: ${i.status || 'New'}</div>
-    </div>
-  </td>
+        <div style="margin-top:8px;">
+            <select onchange="updateStatus('${i._id}', this.value)">
+                <option value="New" ${i.status === 'New' ? 'selected' : ''}>New</option>
+                <option value="Reviewed" ${i.status === 'Reviewed' ? 'selected' : ''}>Reviewed</option>
+                <option value="Interview Scheduled" ${i.status === 'Interview Scheduled' ? 'selected' : ''}>Interview Scheduled</option>
+                <option value="Rejected" ${i.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                <option value="Hired" ${i.status === 'Hired' ? 'selected' : ''}>Hired</option>
+            </select>
+            <div class="status">Status: ${escapeHtml(i.status || 'New')}</div>
+        </div>
+    </td>
 
-  <td>
-    <button class="action-btn" onclick="schedule('${i._id}')">Schedule</button>
-    <button class="action-btn" onclick="editNotes('${i._id}', ${JSON.stringify(i.notes || '')})" style="margin-top:6px;">Notes</button>
-    <button class="action-btn" onclick="hireApplicant('${i._id}')" style="margin-top:6px; background:#2e7d32;">Hire</button>
+    <td>
+        <button class="action-btn" onclick="schedule('${i._id}')">Schedule</button>
+        <button class="action-btn" onclick='editNotes("${i._id}", ${JSON.stringify(i.notes || "")})'>Notes</button>
+        <button class="action-btn hire-btn" onclick="hireApplicant('${i._id}')">Hire</button>
 
-    <div class="status" style="margin-top:8px;">
-      ${i.notes ? `📝 ${i.notes}` : 'No notes yet'}
-      ${i.hiredWorkerUsername ? `<br>👤 Worker: ${i.hiredWorkerUsername}` : ''}
-    </div>
-  </td>
+        <div class="notes-box">
+            ${i.notes ? `📝 ${escapeHtml(i.notes)}` : 'No notes yet'}
+            ${i.hiredWorkerUsername ? `<br>👤 Worker: ${escapeHtml(i.hiredWorkerUsername)}` : ''}
+        </div>
+    </td>
 </tr>
-`;
-        }).join('');
+                `;
+            }).join('');
+        } catch (err) {
+            console.error('Failed to load interviews:', err);
+            document.getElementById('interviewBody').innerHTML =
+                '<tr><td colspan="8" style="text-align:center;">Failed to load interview submissions.</td></tr>';
+        }
     }
 
     async function updateStatus(id, status) {
-        const res = await fetch(`/api/interviews/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ status })
-        });
+        try {
+            const res = await fetch(`/api/interviews/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ status })
+            });
 
-        const data = await res.json();
-        alert(data.message);
-        loadInterviews();
+            const data = await res.json();
+            alert(data.message || 'Status updated.');
+            loadInterviews();
+        } catch (err) {
+            console.error('Status update failed:', err);
+            alert('Failed to update status.');
+        }
     }
 
     async function editNotes(id, currentNotes) {
         const notes = prompt('Enter applicant notes:', currentNotes || '');
         if (notes === null) return;
 
-        const res = await fetch(`/api/interviews/${id}/notes`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ notes })
-        });
+        try {
+            const res = await fetch(`/api/interviews/${id}/notes`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ notes })
+            });
 
-        const data = await res.json();
-        alert(data.message);
-        loadInterviews();
+            const data = await res.json();
+            alert(data.message || 'Notes saved.');
+            loadInterviews();
+        } catch (err) {
+            console.error('Failed to save notes:', err);
+            alert('Failed to save notes.');
+        }
     }
 
     async function hireApplicant(id) {
         if (!confirm('Hire this applicant and create a worker account?')) return;
 
-        const res = await fetch(`/api/interviews/${id}/hire`, {
-            method: 'POST',
-            credentials: 'include'
-        });
+        try {
+            const res = await fetch(`/api/interviews/${id}/hire`, {
+                method: 'POST',
+                credentials: 'include'
+            });
 
-        const data = await res.json();
-        alert(data.message);
-        loadInterviews();
+            const data = await res.json();
+            alert(data.message || 'Applicant hired.');
+            loadInterviews();
+        } catch (err) {
+            console.error('Failed to hire applicant:', err);
+            alert('Failed to hire applicant.');
+        }
     }
 
     async function schedule(id) {
@@ -247,16 +308,21 @@
         const meetLink = prompt('Paste the Google Meet link:');
         if (!meetLink) return;
 
-        const res = await fetch('/api/interviews/schedule', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ id, time, meetLink })
-        });
+        try {
+            const res = await fetch('/api/interviews/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ id, time, meetLink })
+            });
 
-        const data = await res.json();
-        alert(data.message);
-        loadInterviews();
+            const data = await res.json();
+            alert(data.message || 'Interview scheduled.');
+            loadInterviews();
+        } catch (err) {
+            console.error('Failed to schedule interview:', err);
+            alert('Failed to schedule interview.');
+        }
     }
 
     function filterInterviews() {
@@ -265,6 +331,25 @@
             const text = row.textContent.toLowerCase();
             row.style.display = text.includes(q) ? '' : 'none';
         });
+    }
+
+    function copyLink(link) {
+        navigator.clipboard.writeText(link)
+            .then(() => alert('Link copied!'))
+            .catch(() => alert('Failed to copy link.'));
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function escapeAttr(str) {
+        return String(str).replaceAll('"', '&quot;');
     }
 
     loadInterviews();
