@@ -1,51 +1,6 @@
 // server.js
 process.env.NODE_ENV = 'production';
 require('dotenv').config();
-// ───── Twilio ─────
-let twilioClient = null;
-if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-    twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-}
-
-const E164 = /^\+?[1-9]\d{1,14}$/;
-async function notifyUsersOfNewShift(shift) {
-    try {
-        if (!twilioClient) return; // no-op if Twilio not configured
-
-        // Get all owners + workers who opted in and have a valid phone
-        const recipients = await User.find({
-            role: { $in: ['owner', 'worker', 'admin'] },
-            notifySms: true,
-            phone: { $ne: null }
-        }, { phone: 1, username: 1 });
-
-        if (!recipients.length) return;
-
-        const body =
-            `New shift posted:\n` +
-            `📅 ${shift.date} at ${shift.startTime}\n` +
-            `📍 ${shift.location}\n` +
-            (shift.notes ? `📝 ${shift.notes}\n` : '') +
-            `— Jamison Protection`;
-
-        const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
-            ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID }
-            : { from: process.env.TWILIO_FROM };
-
-        const sends = recipients
-            .filter(u => E164.test(u.phone))
-            .map(u => twilioClient.messages.create({
-                ...fromConfig,
-                to: u.phone,
-                body
-            }));
-
-        await Promise.allSettled(sends);
-    } catch (err) {
-        console.error('SMS notify error:', err?.message || err);
-    }
-}
-const nodemailer = require('nodemailer');
 
 // ────── NodeMailer Config ──────
 const transporter = nodemailer.createTransport({
@@ -227,6 +182,51 @@ app.get('/api/session-debug', (req, res) => {
 });
 
 // ────── Role Switch Routes ──────
+// ───── Twilio ─────
+let twilioClient = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
+
+const E164 = /^\+?[1-9]\d{1,14}$/;
+async function notifyUsersOfNewShift(shift) {
+    try {
+        if (!twilioClient) return; // no-op if Twilio not configured
+
+        // Get all owners + workers who opted in and have a valid phone
+        const recipients = await User.find({
+            role: { $in: ['owner', 'worker', 'admin'] },
+            notifySms: true,
+            phone: { $ne: null }
+        }, { phone: 1, username: 1 });
+
+        if (!recipients.length) return;
+
+        const body =
+            `New shift posted:\n` +
+            `📅 ${shift.date} at ${shift.startTime}\n` +
+            `📍 ${shift.location}\n` +
+            (shift.notes ? `📝 ${shift.notes}\n` : '') +
+            `— Jamison Protection`;
+
+        const fromConfig = process.env.TWILIO_MESSAGING_SERVICE_SID
+            ? { messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID }
+            : { from: process.env.TWILIO_FROM };
+
+        const sends = recipients
+            .filter(u => E164.test(u.phone))
+            .map(u => twilioClient.messages.create({
+                ...fromConfig,
+                to: u.phone,
+                body
+            }));
+
+        await Promise.allSettled(sends);
+    } catch (err) {
+        console.error('SMS notify error:', err?.message || err);
+    }
+}
+const nodemailer = require('nodemailer');
 
 // Owner temporarily views as worker
 app.post('/api/switch-to-worker', requireLogin, (req, res) => {
@@ -372,11 +372,26 @@ app.delete('/api/users/:id', requireLogin, isOwner, async (req, res) => {
 });
 
 app.put('/api/users/:id', requireLogin, isOwner, async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ message: 'Password required' });
+    try {
+        const { password, phone, notifySms, hourlyRate, role } = req.body;
 
-  await User.findByIdAndUpdate(req.params.id, { password });
-  res.json({ message: 'Password updated' });
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (password) user.password = password;
+        if (phone !== undefined) user.phone = phone;
+        if (notifySms !== undefined) user.notifySms = notifySms;
+        if (hourlyRate !== undefined) user.hourlyRate = hourlyRate;
+        if (role) user.role = role;
+
+        await user.save();
+        res.json({ message: 'User updated successfully' });
+    } catch (err) {
+        console.error('Update user error:', err);
+        res.status(500).json({ message: 'Failed to update user' });
+    }
 });
 
 
