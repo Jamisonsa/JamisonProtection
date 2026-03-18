@@ -118,8 +118,58 @@
         .fc-button:hover {
             background: #c5303d !important;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+        }
+
+        .modal-content {
+            background-color: #1f1f1f;
+            margin: auto;
+            padding: 25px;
+            border-radius: 10px;
+            width: 400px;
+            color: white;
+            border-left: 5px solid #e63946;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: white;
+        }
     </style>
 </head>
+<div id="shiftModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2 id="modalTitle"></h2>
+
+        <p><strong>Date:</strong> <span id="modalDate"></span></p>
+        <p><strong>Start Time:</strong> <span id="modalStart"></span></p>
+        <p><strong>Expected End:</strong> <span id="modalEnd"></span></p>
+        <p><strong>Location:</strong> <span id="modalLocation"></span></p>
+        <p><strong>Position:</strong> <span id="modalPosition"></span></p>
+        <p><strong>Notes:</strong> <span id="modalNotes"></span></p>
+
+        <div style="margin-top: 18px; display:flex; gap:10px;">
+            <button id="modalActionBtn" onclick="handleModalShiftAction()"></button>
+            <button onclick="closeModal()" style="background:#444;">Close</button>
+        </div>
+    </div>
+</div>
 <body>
 
 <header>
@@ -225,6 +275,8 @@
 
 <script>
     let calendar;
+    let selectedShiftId = null;
+    let selectedShiftType = null;
 
     async function loadShifts() {
         const res = await fetch('/api/shifts', { credentials: 'include' });
@@ -297,15 +349,30 @@
                 },
                 eventClick(info) {
                     const e = info.event;
-                    alert(
-                        `${e.title}\n\n` +
-                        `Date: ${e.extendedProps.date}\n` +
-                        `Start Time: ${e.extendedProps.startTime}\n` +
-                        `Expected End: ${e.extendedProps.expectedEnd || 'N/A'}\n` +
-                        `Location: ${e.extendedProps.location || 'N/A'}\n` +
-                        `Position: ${e.extendedProps.position || 'N/A'}\n` +
-                        `Notes: ${e.extendedProps.notes || 'None'}`
-                    );
+                    const p = e.extendedProps;
+
+                    selectedShiftId = e.id;
+                    selectedShiftType = p.type || 'available';
+
+                    document.getElementById("modalTitle").textContent = e.title;
+                    document.getElementById("modalDate").textContent = p.date || "N/A";
+                    document.getElementById("modalStart").textContent = p.startTime || "N/A";
+                    document.getElementById("modalEnd").textContent = p.expectedEnd || "N/A";
+                    document.getElementById("modalLocation").textContent = p.location || "N/A";
+                    document.getElementById("modalPosition").textContent = p.position || "N/A";
+                    document.getElementById("modalNotes").textContent = p.notes || "None";
+
+                    const actionBtn = document.getElementById("modalActionBtn");
+
+                    if (selectedShiftType === 'claimed') {
+                        actionBtn.textContent = "Drop Shift";
+                        actionBtn.style.background = "#b8860b";
+                    } else {
+                        actionBtn.textContent = "Claim Shift";
+                        actionBtn.style.background = "#e63946";
+                    }
+
+                    document.getElementById("shiftModal").style.display = "block";
                 }
             });
 
@@ -314,7 +381,50 @@
             console.error('Failed to load shift calendar:', err);
         }
     }
+    function closeModal() {
+        document.getElementById("shiftModal").style.display = "none";
+        selectedShiftId = null;
+        selectedShiftType = null;
+    }
+    async function handleModalShiftAction() {
+        if (!selectedShiftId) return;
 
+        try {
+            let url = '';
+            let body = {};
+
+            if (selectedShiftType === 'claimed') {
+                url = '/api/drop';
+                body = { shiftId: selectedShiftId };
+            } else {
+                url = '/api/claim';
+                body = { shiftId: selectedShiftId };
+            }
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            alert(data.message);
+
+            closeModal();
+            await loadShifts();
+            await loadMyShifts();
+            await loadShiftCalendar();
+        } catch (err) {
+            alert('Error updating shift: ' + err.message);
+        }
+    }
+    window.onclick = function(event) {
+        const modal = document.getElementById("shiftModal");
+        if (event.target === modal) {
+            modal.style.display = "none";
+        }
+    };
     async function submitHours(event) {
         event.preventDefault();
 
