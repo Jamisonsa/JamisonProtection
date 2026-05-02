@@ -7,20 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
-    <div id="assignShiftModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:2000; padding-top:120px;">
-        <div style="background:#1f1f1f; color:white; width:420px; margin:auto; padding:25px; border-radius:10px; border-left:5px solid #e63946;">
-            <h2>Assign Shift</h2>
-
-            <label>Select Worker:</label>
-            <select id="assignWorkerSelect"></select>
-
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button onclick="saveAssignedShift()">Assign Shift</button>
-                <button onclick="closeAssignModal()" style="background:#444;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -269,6 +255,26 @@
         .fc-day-today {
             background: rgba(242, 199, 68, 0.08) !important;
         }
+
+        #assignShiftModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            padding-top: 120px;
+        }
+
+        .assign-modal-content {
+            background: #1f1f1f;
+            color: white;
+            width: 420px;
+            max-width: 90%;
+            margin: auto;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 5px solid #e63946;
+        }
     </style>
 </head>
 
@@ -386,57 +392,80 @@
         </div>
 
         <div id="payrollContainer">
-            <p>Enter a date range and click "Generate Payroll".</p>
+            <p>Enter a date range and click Generate Payroll.</p>
         </div>
     </div>
 </main>
 
+<div id="assignShiftModal">
+    <div class="assign-modal-content">
+        <h2>Assign Shift</h2>
+
+        <label>Select Worker:</label>
+        <select id="assignWorkerSelect"></select>
+
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button onclick="saveAssignedShift()">Assign Shift</button>
+            <button onclick="closeAssignModal()" style="background:#444;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    let selectedAssignShiftId = null;
-
-async function openAssignModal(shiftId) {
-    selectedAssignShiftId = shiftId;
-
-    const res = await fetch('/api/users', { credentials: 'include' });
-    const users = await res.json();
-
-    const workers = users.filter(u => u.role === 'worker');
-    const select = document.getElementById('assignWorkerSelect');
-
-    select.innerHTML = workers.map(worker => `
-        <option value="${worker.username}">${worker.username}</option>
-    `).join('');
-
-    document.getElementById('assignShiftModal').style.display = 'block';
-}
-
-function closeAssignModal() {
-    document.getElementById('assignShiftModal').style.display = 'none';
-    selectedAssignShiftId = null;
-}
-
-async function saveAssignedShift() {
-    const username = document.getElementById('assignWorkerSelect').value;
-
-    const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username })
-    });
-
-    const data = await res.json();
-    alert(data.message);
-
-    closeAssignModal();
-    loadShifts();
-    loadOwnerShiftCalendar();
-}
     let ownerCalendar;
+    let selectedAssignShiftId = null;
 
     function showTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
         document.getElementById(tabName + 'Tab').style.display = 'block';
+    }
+
+    async function openAssignModal(shiftId) {
+        selectedAssignShiftId = shiftId;
+
+        const res = await fetch('/api/users', { credentials: 'include' });
+        const users = await res.json();
+
+        const workers = users.filter(u => u.role === 'worker');
+        const select = document.getElementById('assignWorkerSelect');
+
+        if (!workers.length) {
+            select.innerHTML = `<option value="">No workers found</option>`;
+        } else {
+            select.innerHTML = workers.map(worker => `
+                <option value="${worker.username}">${worker.username}</option>
+            `).join('');
+        }
+
+        document.getElementById('assignShiftModal').style.display = 'block';
+    }
+
+    function closeAssignModal() {
+        document.getElementById('assignShiftModal').style.display = 'none';
+        selectedAssignShiftId = null;
+    }
+
+    async function saveAssignedShift() {
+        const username = document.getElementById('assignWorkerSelect').value;
+
+        if (!selectedAssignShiftId || !username) {
+            alert('Please select a worker.');
+            return;
+        }
+
+        const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+
+        closeAssignModal();
+        loadShifts();
+        loadOwnerShiftCalendar();
     }
 
     async function loadShifts() {
@@ -506,6 +535,7 @@ async function saveAssignedShift() {
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button onclick="openAssignModal('${s._id}')">👤 Assign</button>
                             <button class="edit-btn" onclick="editShift('${s._id}')">✏️ Edit</button>
                             <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
                         </div>
@@ -904,11 +934,11 @@ async function saveAssignedShift() {
                     }
                 },
 
-        eventClick(info) {
-    const e = info.event;
-    const p = e.extendedProps;
+                eventClick(info) {
+                    const e = info.event;
+                    const p = e.extendedProps;
 
-    const message =
+                    const message =
 `${e.title}
 
 Date: ${p.date || 'N/A'}
@@ -922,10 +952,17 @@ Notes: ${p.notes || 'None'}
 
 Click OK to assign this shift to a worker.`;
 
-    if (confirm(message)) {
-        openAssignModal(e.id);
+                    if (confirm(message)) {
+                        openAssignModal(e.id);
+                    }
+                }
+            });
+
+            ownerCalendar.render();
+        } catch (err) {
+            console.error('Failed to load owner shift calendar:', err);
+        }
     }
-}
 
     document.addEventListener('DOMContentLoaded', () => {
         loadShifts();
