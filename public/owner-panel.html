@@ -7,6 +7,20 @@
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
+    <div id="assignShiftModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:2000; padding-top:120px;">
+        <div style="background:#1f1f1f; color:white; width:420px; margin:auto; padding:25px; border-radius:10px; border-left:5px solid #e63946;">
+            <h2>Assign Shift</h2>
+
+            <label>Select Worker:</label>
+            <select id="assignWorkerSelect"></select>
+
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="saveAssignedShift()">Assign Shift</button>
+                <button onclick="closeAssignModal()" style="background:#444;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -71,6 +85,10 @@
             cursor: pointer;
         }
 
+        button:hover {
+            background: #c5303d;
+        }
+
         .shift {
             background: #1f1f1f;
             margin: 15px 0;
@@ -79,37 +97,26 @@
             border-radius: 8px;
         }
 
-        .shift button {
-            background: #e63946;
-            border: none;
-            padding: 6px 10px;
-            color: white;
-            border-radius: 4px;
-            margin-top: 6px;
-            cursor: pointer;
-        }
-
-        .shift button:hover {
-            background: #c5303d;
-        }
-
         .delete-btn {
             background: #e63946;
-            border: none;
-            color: white;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            padding: 12px 20px;
+            padding: 10px 14px;
             border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.25s ease-in-out;
-            min-width: 120px;
-            text-align: center;
+            min-width: 110px;
         }
 
-        .delete-btn:hover {
-            background: #c5303d;
-            transform: scale(1.07);
+        .edit-btn {
+            background: #444;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 10px 14px;
+            border-radius: 8px;
+            min-width: 110px;
+        }
+
+        .edit-btn:hover {
+            background: #666;
         }
 
         #toolbar {
@@ -124,30 +131,6 @@
             border-bottom: 2px solid #e63946;
             border-radius: 6px;
             margin-bottom: 10px;
-            opacity: 1;
-            transition: opacity 0.3s ease, transform 0.3s ease;
-        }
-
-        #toolbar.hidden {
-            opacity: 0;
-            transform: translateY(-100%);
-            pointer-events: none;
-        }
-
-        #toolbar button {
-            background: #e63946;
-            color: white;
-            font-weight: bold;
-            padding: 10px 16px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        #toolbar button:hover {
-            background: #c5303d;
-            transform: scale(1.05);
         }
 
         #selectedCount {
@@ -163,29 +146,12 @@
             width: auto;
         }
 
-        #securityLogFilter button {
-            background: #e63946;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        #securityLogFilter button:hover {
-            background: #c5303d;
-        }
-
         nav {
             margin-bottom: 15px;
         }
 
         nav button {
             background: #444;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
             margin-right: 5px;
             width: auto;
         }
@@ -200,12 +166,6 @@
 
         .tab.active {
             display: block;
-        }
-
-        .payroll-table, .payroll-table th, .payroll-table td {
-            border: 1px solid #555;
-            padding: 8px;
-            text-align: center;
         }
 
         .payroll-card {
@@ -239,8 +199,6 @@
         }
 
         #submittedHoursContainer {
-            transition: all 0.3s ease-in-out;
-            overflow: hidden;
             background: #1f1f1f;
             padding: 15px;
             border-radius: 8px;
@@ -266,63 +224,34 @@
         .top-actions button {
             width: auto;
         }
+
         .fc {
             background: #1f1f1f;
             color: white;
         }
+
         .fc-toolbar-title {
             color: #f2c744;
         }
+
         .fc-button {
             background: #e63946 !important;
             border: none !important;
             color: white !important;
         }
+
         .fc-button:hover {
             background: #c5303d !important;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            padding-top: 100px;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-        }
 
-        .modal-content {
-            background-color: #1f1f1f;
-            margin: auto;
-            padding: 25px;
-            border-radius: 10px;
-            width: 400px;
-            color: white;
-            border-left: 5px solid #e63946;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 24px;
-            cursor: pointer;
-        }
-
-        .close:hover {
-            color: white;
-        }
         .fc-col-header-cell {
             background: #2a2a2a !important;
         }
+
         .fc-col-header-cell-cushion {
             color: #ffffff !important;
             text-decoration: none !important;
             font-weight: 700 !important;
-            font-size: 14px;
-            padding: 8px 4px;
-            display: inline-block;
         }
 
         .fc-daygrid-day-number {
@@ -342,6 +271,7 @@
         }
     </style>
 </head>
+
 <body>
 <header>
     <h1>Owner Panel</h1>
@@ -365,6 +295,7 @@
 <main>
     <div id="shiftsTab" class="tab active">
         <h2>Create New Shift</h2>
+
         <form id="shiftForm" onsubmit="postShift(event)">
             <label>Date:</label>
             <input type="date" id="shiftDate" required>
@@ -386,16 +317,18 @@
             <label>Notes:</label>
             <textarea id="shiftNotes" placeholder="Additional notes..."></textarea>
 
-            <button type="submit" class="submit-btn">Post Shift</button>
+            <button type="submit">Post Shift</button>
         </form>
 
         <h2>All Shifts</h2>
 
         <div style="margin-bottom: 15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <input type="text" id="filterName" placeholder="Filter by worker name..." style="padding:6px; width:220px;">
-            <input type="date" id="filterDate" style="padding:6px; width:auto;">
+            <input type="text" id="filterName" placeholder="Filter by worker name..." style="width:220px;">
+            <input type="date" id="filterDate" style="width:auto;">
+
             <button onclick="loadShifts()">Apply Filter</button>
             <button onclick="clearFilters()">Clear</button>
+            <button onclick="showAllShifts()">Show All Shifts</button>
         </div>
 
         <div id="shiftList"></div>
@@ -410,20 +343,19 @@
         <div id="submittedHoursContainer" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>Submitted Hours</h3>
-                <button onclick="closeSubmittedHours()" style="background:#e63946; color:white; border:none; padding:6px 12px; border-radius:5px; cursor:pointer; font-weight:bold;">
-                    Close ✖
-                </button>
+                <button onclick="closeSubmittedHours()">Close ✖</button>
             </div>
+
             <div id="submittedHoursContent">
                 <p>Loading...</p>
             </div>
         </div>
     </div>
 
-    <div id="securityLogsTab" class="tab" style="display:none;">
+    <div id="securityLogsTab" class="tab">
         <h2>Security Log Viewer</h2>
 
-        <div id="securityLogFilter" style="margin-bottom: 15px;">
+        <div id="securityLogFilter">
             <label>Date:</label>
             <input type="date" id="filterDateLog">
 
@@ -440,7 +372,7 @@
         </div>
     </div>
 
-    <div id="payrollTab" class="tab" style="display:none;">
+    <div id="payrollTab" class="tab">
         <h2>Payroll Summary</h2>
 
         <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -460,6 +392,46 @@
 </main>
 
 <script>
+    let selectedAssignShiftId = null;
+
+async function openAssignModal(shiftId) {
+    selectedAssignShiftId = shiftId;
+
+    const res = await fetch('/api/users', { credentials: 'include' });
+    const users = await res.json();
+
+    const workers = users.filter(u => u.role === 'worker');
+    const select = document.getElementById('assignWorkerSelect');
+
+    select.innerHTML = workers.map(worker => `
+        <option value="${worker.username}">${worker.username}</option>
+    `).join('');
+
+    document.getElementById('assignShiftModal').style.display = 'block';
+}
+
+function closeAssignModal() {
+    document.getElementById('assignShiftModal').style.display = 'none';
+    selectedAssignShiftId = null;
+}
+
+async function saveAssignedShift() {
+    const username = document.getElementById('assignWorkerSelect').value;
+
+    const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username })
+    });
+
+    const data = await res.json();
+    alert(data.message);
+
+    closeAssignModal();
+    loadShifts();
+    loadOwnerShiftCalendar();
+}
     let ownerCalendar;
 
     function showTab(tabName) {
@@ -483,112 +455,100 @@
 
             const matchName = !name || claimedByText.toLowerCase().includes(name);
             const matchDate = !date || s.date === date;
+
             return matchName && matchDate;
         });
 
+        renderShiftList(filtered);
+    }
+
+    function renderShiftList(shifts) {
         const container = document.getElementById('shiftList');
-        if (filtered.length === 0) {
+
+        if (!shifts.length) {
             container.innerHTML = '<p>No shifts found.</p>';
             return;
         }
 
         container.innerHTML = `
-      <div id="toolbar" class="hidden">
-        <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
-        <span id="selectedCount">0 selected</span>
-      </div>
+            <div id="toolbar">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="selectAllShifts" onchange="toggleSelectAllShifts()" style="width:auto;">
+                    Select All Visible
+                </label>
 
-      <div id="shiftContainer">
-        ${filtered.map(s => `
-          <div class="shift" style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; background:#1f1f1f; padding:15px; margin:10px 0; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
-            <div style="display:flex; align-items:flex-start; gap:12px; flex:1;">
-              <input
-                type="checkbox"
-                class="shift-checkbox"
-                value="${s._id}"
-                onchange="updateSelectedCount()"
-                style="width:auto; margin-top:4px;"
-              >
-              <div>
-                <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
-                Location: ${s.location || 'Unknown'}<br>
-                Position: ${s.position || 'Unassigned'}<br>
-                Status: ${s.status || 'available'}<br>
-                Notes: ${s.notes || 'None'}<br>
-                Claimed by: ${typeof s.claimedBy === 'object' ? (s.claimedBy.username || 'Not claimed yet') : (s.claimedBy || 'Not claimed yet')}
-              </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span id="selectedCount">0 selected</span>
+                    <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
+                </div>
             </div>
-            <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
-          </div>
-        `).join('')}
-      </div>
-    `;
+
+            <div id="shiftContainer">
+                ${shifts.map(s => `
+                    <div class="shift" style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
+                        <div style="display:flex; align-items:flex-start; gap:12px; flex:1;">
+                            <input
+                                type="checkbox"
+                                class="shift-checkbox"
+                                value="${s._id}"
+                                onchange="updateSelectedCount()"
+                                style="width:auto; margin-top:4px;"
+                            >
+
+                            <div>
+                                <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
+                                Location: ${s.location || 'Unknown'}<br>
+                                Position: ${s.position || 'Unassigned'}<br>
+                                Status: ${s.status || 'available'}${s.status === 'dropped' && s.droppedBy ? ` by ${s.droppedBy}` : ''}<br>
+                                Notes: ${s.notes || 'None'}<br>
+                                Claimed by: ${typeof s.claimedBy === 'object' ? (s.claimedBy.username || 'Not claimed yet') : (s.claimedBy || 'Not claimed yet')}
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button class="edit-btn" onclick="editShift('${s._id}')">✏️ Edit</button>
+                            <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
-    async function viewSubmittedHours() {
-        const container = document.getElementById('submittedHoursContainer');
-        const content = document.getElementById('submittedHoursContent');
-
-        container.style.display = 'block';
-        content.innerHTML = '<p>Loading submitted logs...</p>';
-
-        try {
-            const res = await fetch('/api/view-logs', { credentials: 'include' });
-            if (!res.ok) {
-                content.innerHTML = '<p>Failed to load logs.</p>';
-                return;
-            }
-
-            const data = await res.json();
-
-            if (!Object.keys(data).length) {
-                content.innerHTML = '<p>No submitted hours found.</p>';
-                return;
-            }
-
-            content.innerHTML = Object.entries(data).map(([user, logs]) => `
-        <div class="payroll-card">
-          <h3>${user}</h3>
-          <table class="payroll-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Location</th>
-                <th>Position</th>
-                <th>Hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${logs.map(l => `
-                <tr>
-                  <td>${l.date}</td>
-                  <td>${l.startTime}</td>
-                  <td>${l.endTime}</td>
-                  <td>${l.location}</td>
-                  <td>${l.position}</td>
-                  <td>${l.hours}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `).join('');
-        } catch (err) {
-            console.error('Error fetching logs:', err);
-            content.innerHTML = '<p>Error loading logs.</p>';
-        }
-    }
-
-    function closeSubmittedHours() {
-        document.getElementById('submittedHoursContainer').style.display = 'none';
+    function showAllShifts() {
+        document.getElementById('filterName').value = '';
+        document.getElementById('filterDate').value = '';
+        loadShifts();
     }
 
     function clearFilters() {
         document.getElementById('filterName').value = '';
         document.getElementById('filterDate').value = '';
         loadShifts();
+    }
+
+    function toggleSelectAllShifts() {
+        const selectAll = document.getElementById('selectAllShifts');
+        const checkboxes = document.querySelectorAll('.shift-checkbox');
+
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('.shift-checkbox');
+        const checked = document.querySelectorAll('.shift-checkbox:checked').length;
+        const counter = document.getElementById('selectedCount');
+        const selectAll = document.getElementById('selectAllShifts');
+
+        if (counter) counter.textContent = `${checked} selected`;
+
+        if (selectAll) {
+            selectAll.checked = checkboxes.length > 0 && checked === checkboxes.length;
+        }
     }
 
     async function postShift(event) {
@@ -612,9 +572,151 @@
 
         const data = await res.json();
         alert(data.message);
+
         document.getElementById('shiftForm').reset();
         loadShifts();
         loadOwnerShiftCalendar();
+    }
+
+    async function deleteShift(id) {
+        if (!confirm('Are you sure you want to delete this shift?')) return;
+
+        const res = await fetch(`/api/delete-shift/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        const data = await res.json();
+        alert(data.message);
+
+        loadShifts();
+        loadOwnerShiftCalendar();
+    }
+
+    async function deleteSelectedShifts() {
+        const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
+
+        if (checkboxes.length === 0) {
+            alert('No shifts selected.');
+            return;
+        }
+
+        if (!confirm(`Delete ${checkboxes.length} selected shift(s)?`)) return;
+
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+
+        const res = await fetch('/api/delete-multiple-shifts', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ids })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+
+        loadShifts();
+        loadOwnerShiftCalendar();
+    }
+
+    async function editShift(id) {
+        const date = prompt('Enter new shift date (YYYY-MM-DD):');
+        if (!date) return;
+
+        const startTime = prompt('Enter new start time (HH:MM):');
+        if (!startTime) return;
+
+        const expectedEnd = prompt('Enter expected end time:');
+        if (!expectedEnd) return;
+
+        const location = prompt('Enter location:', 'John Carroll School');
+        if (!location) return;
+
+        const position = prompt('Enter work position:');
+        if (!position) return;
+
+        const notes = prompt('Enter notes:', '');
+
+        const res = await fetch(`/api/edit-shift/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                date,
+                startTime,
+                expectedEnd,
+                location,
+                position,
+                notes
+            })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+
+        loadShifts();
+        loadOwnerShiftCalendar();
+    }
+
+    async function viewSubmittedHours() {
+        const container = document.getElementById('submittedHoursContainer');
+        const content = document.getElementById('submittedHoursContent');
+
+        container.style.display = 'block';
+        content.innerHTML = '<p>Loading submitted logs...</p>';
+
+        try {
+            const res = await fetch('/api/view-logs', { credentials: 'include' });
+
+            if (!res.ok) {
+                content.innerHTML = '<p>Failed to load logs.</p>';
+                return;
+            }
+
+            const data = await res.json();
+
+            if (!Object.keys(data).length) {
+                content.innerHTML = '<p>No submitted hours found.</p>';
+                return;
+            }
+
+            content.innerHTML = Object.entries(data).map(([user, logs]) => `
+                <div class="payroll-card">
+                    <h3>${user}</h3>
+                    <table class="payroll-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Location</th>
+                                <th>Position</th>
+                                <th>Hours</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(l => `
+                                <tr>
+                                    <td>${l.date}</td>
+                                    <td>${l.startTime}</td>
+                                    <td>${l.endTime}</td>
+                                    <td>${l.location}</td>
+                                    <td>${l.position}</td>
+                                    <td>${l.hours}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Error fetching logs:', err);
+            content.innerHTML = '<p>Error loading logs.</p>';
+        }
+    }
+
+    function closeSubmittedHours() {
+        document.getElementById('submittedHoursContainer').style.display = 'none';
     }
 
     async function loadPayroll() {
@@ -636,112 +738,45 @@
         }
 
         container.innerHTML = data.map(worker => `
-      <div class="payroll-card">
-        <h3>${worker.user}</h3>
-        <p><strong>Rate:</strong> $${worker.rate}/hr</p>
+            <div class="payroll-card">
+                <h3>${worker.user}</h3>
+                <p><strong>Rate:</strong> $${worker.rate}/hr</p>
 
-        <table class="payroll-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Location</th>
-              <th>Position</th>
-              <th>Hours</th>
-              <th>Pay ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${worker.entries.map(entry => `
-              <tr>
-                <td>${entry.date}</td>
-                <td>${entry.start}</td>
-                <td>${entry.end}</td>
-                <td>${entry.location}</td>
-                <td>${entry.position}</td>
-                <td>${entry.hours}</td>
-                <td>${entry.pay}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-          <tfoot>
-            <tr class="total-row">
-              <td colspan="5"><strong>Total</strong></td>
-              <td><strong>${worker.totalHours}</strong></td>
-              <td><strong>$${worker.totalPay}</strong></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    `).join('');
-    }
-
-    function logout() {
-        fetch('/logout', {
-            method: 'POST',
-            credentials: 'include'
-        }).then(() => location.href = 'login.html');
-    }
-
-    function switchToWorker() {
-        fetch('/api/switch-to-worker', {
-            method: 'POST',
-            credentials: 'include'
-        })
-            .then(res => res.ok ? (location.href = 'worker-dashboard.html') : alert('Only owner can switch.'))
-            .catch(err => alert('Switch failed: ' + err.message));
-    }
-
-    async function deleteShift(id) {
-        if (!confirm('Are you sure you want to delete this shift?')) return;
-
-        const res = await fetch(`/api/delete-shift/${id}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
-
-        const data = await res.json();
-        alert(data.message);
-        loadShifts();
-        loadOwnerShiftCalendar();
-    }
-
-    async function deleteSelectedShifts() {
-        const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
-        if (checkboxes.length === 0) return alert('No shifts selected.');
-
-        if (!confirm(`Delete ${checkboxes.length} selected shifts?`)) return;
-
-        const ids = Array.from(checkboxes).map(cb => cb.value);
-
-        const res = await fetch('/api/delete-multiple-shifts', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ids })
-        });
-
-        const data = await res.json();
-        alert(data.message);
-        loadShifts();
-        loadOwnerShiftCalendar();
-    }
-
-    function updateSelectedCount() {
-        const checked = document.querySelectorAll('.shift-checkbox:checked').length;
-        const counter = document.getElementById('selectedCount');
-        const toolbar = document.getElementById('toolbar');
-
-        if (counter) counter.textContent = `${checked} selected`;
-
-        if (toolbar) {
-            if (checked > 0) {
-                toolbar.classList.remove('hidden');
-            } else {
-                toolbar.classList.add('hidden');
-            }
-        }
+                <table class="payroll-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Location</th>
+                            <th>Position</th>
+                            <th>Hours</th>
+                            <th>Pay ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${worker.entries.map(entry => `
+                            <tr>
+                                <td>${entry.date}</td>
+                                <td>${entry.start}</td>
+                                <td>${entry.end}</td>
+                                <td>${entry.location}</td>
+                                <td>${entry.position}</td>
+                                <td>${entry.hours}</td>
+                                <td>${entry.pay}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="5"><strong>Total</strong></td>
+                            <td><strong>${worker.totalHours}</strong></td>
+                            <td><strong>$${worker.totalPay}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `).join('');
     }
 
     async function loadSecurityLogs(date = '', initials = '') {
@@ -757,18 +792,22 @@
             const logs = await res.json();
 
             const container = document.getElementById('securityLogContainer');
+
             if (!logs.length) {
                 container.innerHTML = '<p>No logs found.</p>';
                 return;
             }
 
             container.innerHTML = logs.map(log => `
-        <div class="shift" style="background:#1f1f1f; margin:8px 0; padding:10px; border-left:4px solid #f2c744;">
-          <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
-          ${log.description}<br>
-          <small>Initials: ${log.initials} | Submitted by: ${typeof log.submittedBy === 'object' ? (log.submittedBy.username || 'Unknown') : log.submittedBy}</small>
-        </div>
-      `).join('');
+                <div class="shift" style="border-left:4px solid #f2c744;">
+                    <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
+                    ${log.description}<br>
+                    <small>
+                        Initials: ${log.initials} |
+                        Submitted by: ${typeof log.submittedBy === 'object' ? (log.submittedBy.username || 'Unknown') : log.submittedBy}
+                    </small>
+                </div>
+            `).join('');
         } catch (err) {
             console.error('Error loading logs:', err);
         }
@@ -791,10 +830,27 @@
         const initials = document.getElementById('filterInitialsLog').value;
 
         let url = '/api/security-logs?format=csv';
+
         if (date) url += `&date=${encodeURIComponent(date)}`;
         if (initials) url += `&initials=${encodeURIComponent(initials)}`;
 
         window.open(url, '_blank');
+    }
+
+    function logout() {
+        fetch('/logout', {
+            method: 'POST',
+            credentials: 'include'
+        }).then(() => location.href = 'login.html');
+    }
+
+    function switchToWorker() {
+        fetch('/api/switch-to-worker', {
+            method: 'POST',
+            credentials: 'include'
+        })
+            .then(res => res.ok ? location.href = 'worker-dashboard.html' : alert('Only owner can switch.'))
+            .catch(err => alert('Switch failed: ' + err.message));
     }
 
     async function goToAdmin() {
@@ -830,6 +886,7 @@
                 initialView: 'dayGridMonth',
                 height: 'auto',
                 events,
+
                 eventDidMount(info) {
                     const status = info.event.extendedProps.status;
                     const claimedBy = info.event.extendedProps.claimedBy;
@@ -846,36 +903,29 @@
                         info.el.style.borderColor = '#e63946';
                     }
                 },
-                eventClick(info) {
-                    const e = info.event;
-                    const p = e.extendedProps;
 
-                    const start = e.start;
-                    const formattedDate = p.date || 'N/A';
-                    const formattedTime = start
-                        ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        : (p.startTime || 'N/A');
+        eventClick(info) {
+    const e = info.event;
+    const p = e.extendedProps;
 
-                    alert(
-                        `${e.title}
+    const message =
+`${e.title}
 
-Date: ${formattedDate}
-Start Time: ${formattedTime}
+Date: ${p.date || 'N/A'}
+Start Time: ${p.startTime || 'N/A'}
 Expected End: ${p.expectedEnd || 'N/A'}
 Location: ${p.location || 'N/A'}
 Position: ${p.position || 'N/A'}
-Status: ${p.status || 'N/A'}
+Status: ${p.status || 'N/A'}${p.status === 'dropped' && p.droppedBy ? ` by ${p.droppedBy}` : ''}
 Claimed By: ${p.claimedBy || 'Open'}
-Notes: ${p.notes || 'None'}`
-                    );
-                }
-            });
+Notes: ${p.notes || 'None'}
 
-            ownerCalendar.render();
-        } catch (err) {
-            console.error('Failed to load owner shift calendar:', err);
-        }
+Click OK to assign this shift to a worker.`;
+
+    if (confirm(message)) {
+        openAssignModal(e.id);
     }
+}
 
     document.addEventListener('DOMContentLoaded', () => {
         loadShifts();

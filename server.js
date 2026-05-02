@@ -794,16 +794,17 @@ app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
                 ? `${shift.location} — ${shift.claimedBy}`
                 : `${shift.location} — Open`,
             start: `${shift.date}T${shift.startTime}`,
-            extendedProps: {
-                date: shift.date,
-                startTime: shift.startTime,
-                expectedEnd: shift.expectedEnd || '',
-                location: shift.location || '',
-                position: shift.position || '',
-                notes: shift.notes || '',
-                status: shift.status,
-                claimedBy: shift.claimedBy || null
-            }
+           extendedProps: {
+               date: shift.date,
+               startTime: shift.startTime,
+               expectedEnd: shift.expectedEnd || '',
+               location: shift.location || '',
+               position: shift.position || '',
+               notes: shift.notes || '',
+               status: shift.status,
+               claimedBy: shift.claimedBy || null,
+               droppedBy: shift.droppedBy || null
+           }
         }));
 
         res.json(events);
@@ -814,6 +815,52 @@ app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
 });
 app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
   return res.sendStatus(200);
+});
+// Owner assigns a shift to a worker
+app.put('/api/assign-shift/:id', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { username } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ message: 'Worker username is required.' });
+        }
+
+        const worker = await User.findOne({ username, role: 'worker' });
+        if (!worker) {
+            return res.status(404).json({ message: 'Worker not found.' });
+        }
+
+        const shift = await Shift.findById(req.params.id);
+        if (!shift) {
+            return res.status(404).json({ message: 'Shift not found.' });
+        }
+
+        shift.claimedBy = username;
+        shift.status = 'claimed';
+        shift.droppedBy = null;
+        shift.dropTime = null;
+        shift.alertSent = false;
+
+        await shift.save();
+
+        res.json({ message: `Shift assigned to ${username} successfully.` });
+    } catch (err) {
+        console.error('Assign shift error:', err);
+        res.status(500).json({ message: 'Failed to assign shift.' });
+    }
+});
+
+// Worker views their own submitted hours
+app.get('/api/my-hours', requireLogin, async (req, res) => {
+    try {
+        const username = req.session.user.username;
+
+        const logs = await Log.find({ user: username }).sort({ date: -1 });
+        res.json(logs);
+    } catch (err) {
+        console.error('My hours error:', err);
+        res.status(500).json({ message: 'Failed to load submitted hours.' });
+    }
 });
 // ─── Debug Session Route ───
 app.get('/api/debug-session', (req, res) => {
@@ -833,7 +880,27 @@ app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
     console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
     res.json(shifts);
 });
+// Edit a shift (Owner only)
+app.put('/api/edit-shift/:id', requireLogin, isOwner, async (req, res) => {
+    try {
+        const { date, startTime, expectedEnd, location, position, notes, status } = req.body;
 
+        const updatedShift = await Shift.findByIdAndUpdate(
+            req.params.id,
+            { date, startTime, expectedEnd, location, position, notes, status },
+            { new: true }
+        );
+
+        if (!updatedShift) {
+            return res.status(404).json({ message: 'Shift not found' });
+        }
+
+        res.json({ message: 'Shift updated successfully', shift: updatedShift });
+    } catch (err) {
+        console.error('Edit shift error:', err);
+        res.status(500).json({ message: 'Failed to update shift' });
+    }
+});
 // Current user's claimed shifts (to show Drop buttons)
 app.get('/api/my-shifts', requireLogin, isWorker, async (req, res) => {
     const shifts = await Shift.find({
@@ -1355,6 +1422,40 @@ Please log in and change your password as soon as possible.
         res.status(500).json({ message: 'Failed to hire applicant.' });
     }
 });
+async function deleteExpiredShifts() {
+    try {
+        const now = new Date();
+        const shifts = await Shift.find();
+
+        for (const shift of shifts) {
+            if (!shift.date || !shift.startTime) continue;
+
+            let deleteAfter;
+
+            // If expectedEnd is in 24-hour time like "17:00"
+            if (shift.expectedEnd && /^\d{2}:\d{2}$/.test(shift.expectedEnd)) {
+                deleteAfter = new Date(`${shift.date}T${shift.expectedEnd}:00`);
+            } else {
+                // If expectedEnd is text like "Until Dismissed",
+                // delete the shift the next day at midnight
+                deleteAfter = new Date(`${shift.date}T23:59:59`);
+            }
+
+            if (deleteAfter < now) {
+                await Shift.findByIdAndDelete(shift._id);
+                console.log(`🗑 Deleted expired shift: ${shift.date} ${shift.startTime}`);
+            }
+        }
+    } catch (err) {
+        console.error('Expired shift cleanup error:', err);
+    }
+}
+
+// Run every hour
+setInterval(deleteExpiredShifts, 60 * 60 * 1000);
+
+// Also run once when server starts
+deleteExpiredShifts();
 // ────── Start Server ──────
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -212,11 +212,19 @@
 </header>
 
 <main>
-    <h2>Available Shifts</h2>
-    <div id="shiftList"></div>
+    <h2 onclick="toggleSection('availableShiftSection')" style="cursor:pointer;">
+        Available Shifts ▼
+    </h2>
+    <div id="availableShiftSection">
+        <div id="shiftList"></div>
+    </div>
 
-    <h2>My Shifts</h2>
-    <div id="myShiftList"></div>
+    <h2 onclick="toggleSection('myShiftSection')" style="cursor:pointer;">
+        My Shifts ▼
+    </h2>
+    <div id="myShiftSection">
+        <div id="myShiftList"></div>
+    </div>
 
     <hr>
 
@@ -247,7 +255,14 @@
 
         <button type="submit">Submit Hours</button>
     </form>
+    <hr>
 
+    <button onclick="viewMySubmittedHours()">View My Submitted Hours</button>
+
+    <div id="mySubmittedHoursContainer" style="display:none; margin-top:20px;">
+        <h3>My Submitted Hours</h3>
+        <div id="mySubmittedHoursContent"></div>
+    </div>
     <hr>
 
     <h2>Daily Security Log</h2>
@@ -514,7 +529,48 @@
         document.getElementById('securityLogForm').reset();
         loadSecurityLogs();
     }
+async function viewMySubmittedHours() {
+    const container = document.getElementById('mySubmittedHoursContainer');
+    const content = document.getElementById('mySubmittedHoursContent');
 
+    container.style.display = 'block';
+    content.innerHTML = '<p>Loading...</p>';
+
+    const res = await fetch('/api/my-hours', { credentials: 'include' });
+    const logs = await res.json();
+
+    if (!logs.length) {
+        content.innerHTML = '<p>You have not submitted any hours yet.</p>';
+        return;
+    }
+
+    content.innerHTML = `
+        <table style="width:100%; border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Location</th>
+                    <th>Position</th>
+                    <th>Hours</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${logs.map(log => `
+                    <tr>
+                        <td>${log.date}</td>
+                        <td>${log.startTime}</td>
+                        <td>${log.endTime}</td>
+                        <td>${log.location}</td>
+                        <td>${log.position}</td>
+                        <td>${log.hours}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
     async function loadSecurityLogs(date = '', initials = '') {
         try {
             let url = '/api/security-logs';
@@ -584,7 +640,10 @@
         document.getElementById('filterInitials').value = '';
         loadSecurityLogs();
     }
-
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+}
     function exportSecurityLogs() {
         const date = document.getElementById('filterDate').value;
         const initials = document.getElementById('filterInitials').value;
