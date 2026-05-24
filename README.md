@@ -12,7 +12,10 @@ This project was developed to modernize and simplify operations for a growing se
 The application includes separate dashboards for administrators and workers, authentication systems, scheduling tools, interview management, and operational tracking features.
 
 ---
+## Live Website
 
+[Visit Jamison Protection](https://www.jamisonprotection.com/)
+---
 # Features
 
 ## Authentication & Security
