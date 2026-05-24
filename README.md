@@ -11,7 +11,9 @@ This project was developed to modernize and simplify operations for a growing se
 
 The application includes separate dashboards for administrators and workers, authentication systems, scheduling tools, interview management, and operational tracking features.
 
----
+## Purpose
+This platform was developed for a real private security business to streamline scheduling, workforce management, interview tracking, payroll logging, and operational reporting.
+
 ## Live Website
 
 [Visit Jamison Protection](https://www.jamisonprotection.com/)
