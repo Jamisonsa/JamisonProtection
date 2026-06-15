@@ -577,24 +577,62 @@ app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
 
     res.json({ message: 'Shift claimed successfully' });
 });
+async function notifyOwnersOfDroppedShift(shift) {
+    try {
+        await transporter.sendMail({
+            from: `"Jamison Protection Shifts" <${process.env.CONTACT_EMAIL_USER}>`,
+            to: 'jamisonprotectionllc@gmail.com',
+            subject: `⚠️ Shift Dropped by ${shift.droppedBy}`,
+            text:
+`A shift was dropped and needs attention.
 
+Dropped by: ${shift.droppedBy}
+Date: ${shift.date}
+Start Time: ${shift.startTime}
+Expected End: ${shift.expectedEnd || 'N/A'}
+Location: ${shift.location}
+Position: ${shift.position || 'N/A'}
+Notes: ${shift.notes || 'None'}
+
+Status: ${shift.status}
+
+— Jamison Protection System`
+        });
+
+        console.log(`📧 Drop email sent for shift dropped by ${shift.droppedBy}`);
+    } catch (err) {
+        console.error('Dropped shift email error:', err);
+    }
+}
 
 // ────── Drop Shift ──────
 app.post('/api/drop', requireLogin, isWorker, async (req, res) => {
-    const { shiftId } = req.body;
-    const shift = await Shift.findById(shiftId);
-    if (!shift) return res.status(404).json({ message: 'Shift not found' });
-    if (shift.claimedBy !== req.session.user.username)
-        return res.status(403).json({ message: 'You can only drop your own shifts' });
+    try {
+        const { shiftId } = req.body;
 
-    shift.status = 'dropped';
-    shift.droppedBy = req.session.user.username;
-    shift.claimedBy = null;
-    shift.dropTime = new Date();
-    // keep alertSent as-is; 24h checker will set it when it fires
-    await shift.save();
+        const shift = await Shift.findById(shiftId);
+        if (!shift) return res.status(404).json({ message: 'Shift not found' });
 
-    res.json({ message: 'Shift dropped successfully' });
+        if (shift.claimedBy !== req.session.user.username) {
+            return res.status(403).json({ message: 'You can only drop your own shifts' });
+        }
+
+        shift.status = 'dropped';
+        shift.droppedBy = req.session.user.username;
+        shift.claimedBy = null;
+        shift.dropTime = new Date();
+
+        await shift.save();
+
+        notifyOwnersOfDroppedShift(shift).catch(err => {
+            console.error('Drop email failed:', err);
+        });
+
+        res.json({ message: 'Shift dropped successfully. Owner has been emailed.' });
+    } catch (err) {
+        console.error('Drop shift error:', err);
+        res.status(500).json({ message: 'Failed to drop shift.' });
+    }
 });
 
 app.post('/api/repost-shift', requireLogin, isOwner, async (req, res) => {
@@ -825,9 +863,15 @@ app.put('/api/assign-shift/:id', requireLogin, isOwner, async (req, res) => {
             return res.status(400).json({ message: 'Worker username is required.' });
         }
 
-        const worker = await User.findOne({ username, role: 'worker' });
-        if (!worker) {
-            return res.status(404).json({ message: 'Worker not found.' });
+        const user = await User.findOne({
+            username,
+            role: { $in: ['worker', 'owner'] }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'Worker or owner not found.'
+            });
         }
 
         const shift = await Shift.findById(req.params.id);

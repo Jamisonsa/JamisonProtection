@@ -401,7 +401,7 @@
     <div class="assign-modal-content">
         <h2>Assign Shift</h2>
 
-        <label>Select Worker:</label>
+        <label>Select Worker or Owner:</label>
         <select id="assignWorkerSelect"></select>
 
         <div style="display:flex; gap:10px; margin-top:15px;">
@@ -416,28 +416,50 @@
     let selectedAssignShiftId = null;
 
     function showTab(tabName) {
-        document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
-        document.getElementById(tabName + 'Tab').style.display = 'block';
+        document.querySelectorAll('.tab').forEach(t => {
+            t.style.display = 'none';
+            t.classList.remove('active');
+        });
+
+        const tab = document.getElementById(tabName + 'Tab');
+        if (tab) {
+            tab.style.display = 'block';
+            tab.classList.add('active');
+        }
     }
 
     async function openAssignModal(shiftId) {
         selectedAssignShiftId = shiftId;
 
-        const res = await fetch('/api/users', { credentials: 'include' });
-        const users = await res.json();
+        try {
+            const res = await fetch('/api/users', { credentials: 'include' });
 
-        const workers = users.filter(u => u.role === 'worker');
-        const select = document.getElementById('assignWorkerSelect');
+            if (!res.ok) {
+                alert('Could not load workers/owners.');
+                return;
+            }
 
-        if (!workers.length) {
-            select.innerHTML = `<option value="">No workers found</option>`;
-        } else {
-            select.innerHTML = workers.map(worker => `
-                <option value="${worker.username}">${worker.username}</option>
-            `).join('');
+            const users = await res.json();
+
+            // Owners can now assign shifts to workers OR owners
+            const assignableUsers = users.filter(u => u.role === 'worker' || u.role === 'owner');
+            const select = document.getElementById('assignWorkerSelect');
+
+            if (!assignableUsers.length) {
+                select.innerHTML = `<option value="">No workers or owners found</option>`;
+            } else {
+                select.innerHTML = assignableUsers.map(user => `
+                    <option value="${user.username}">
+                        ${user.username} (${user.role})
+                    </option>
+                `).join('');
+            }
+
+            document.getElementById('assignShiftModal').style.display = 'block';
+        } catch (err) {
+            console.error('Assign modal error:', err);
+            alert('Error loading workers/owners.');
         }
-
-        document.getElementById('assignShiftModal').style.display = 'block';
     }
 
     function closeAssignModal() {
@@ -449,46 +471,69 @@
         const username = document.getElementById('assignWorkerSelect').value;
 
         if (!selectedAssignShiftId || !username) {
-            alert('Please select a worker.');
+            alert('Please select a worker or owner.');
             return;
         }
 
-        const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ username })
-        });
+        try {
+            const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username })
+            });
 
-        const data = await res.json();
-        alert(data.message);
+            const data = await res.json();
+            alert(data.message || 'Shift assignment complete.');
 
-        closeAssignModal();
-        loadShifts();
-        loadOwnerShiftCalendar();
+            closeAssignModal();
+            loadShifts();
+            loadOwnerShiftCalendar();
+        } catch (err) {
+            console.error('Assign shift error:', err);
+            alert('Failed to assign shift.');
+        }
     }
 
     async function loadShifts() {
-        const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
-        const date = document.getElementById('filterDate')?.value || '';
+        try {
+            const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
+            const date = document.getElementById('filterDate')?.value || '';
 
-        const res = await fetch('/api/view-all-shifts', { credentials: 'include' });
-        if (res.status === 401) return location.href = 'login.html';
+            const res = await fetch('/api/view-all-shifts', {
+                credentials: 'include'
+            });
 
-        const shifts = await res.json();
+            if (res.status === 401) {
+                location.href = 'login.html';
+                return;
+            }
 
-        const filtered = shifts.filter(s => {
-            const claimedByText = typeof s.claimedBy === 'object'
-                ? (s.claimedBy?.username || '')
-                : (s.claimedBy || '');
+            if (!res.ok) {
+                console.error('Failed loading shifts:', res.status);
+                document.getElementById('shiftList').innerHTML =
+                    `<p>Error loading shifts (${res.status})</p>`;
+                return;
+            }
 
-            const matchName = !name || claimedByText.toLowerCase().includes(name);
-            const matchDate = !date || s.date === date;
+            const shifts = await res.json();
 
-            return matchName && matchDate;
-        });
+            const filtered = shifts.filter(s => {
+                const claimedByText = typeof s.claimedBy === 'object'
+                    ? (s.claimedBy?.username || '')
+                    : (s.claimedBy || '');
 
-        renderShiftList(filtered);
+                const matchName = !name || claimedByText.toLowerCase().includes(name);
+                const matchDate = !date || s.date === date;
+
+                return matchName && matchDate;
+            });
+
+            renderShiftList(filtered);
+        } catch (err) {
+            console.error('Failed loading shifts:', err);
+            document.getElementById('shiftList').innerHTML = '<p>Error loading shifts.</p>';
+        }
     }
 
     function renderShiftList(shifts) {
@@ -502,7 +547,12 @@
         container.innerHTML = `
             <div id="toolbar">
                 <label style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" id="selectAllShifts" onchange="toggleSelectAllShifts()" style="width:auto;">
+                    <input
+                        type="checkbox"
+                        id="selectAllShifts"
+                        onchange="toggleSelectAllShifts()"
+                        style="width:auto;"
+                    >
                     Select All Visible
                 </label>
 
@@ -514,12 +564,16 @@
 
             <div id="shiftContainer">
                 ${shifts.map(s => `
-                    <div class="shift" style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};">
+                    <div
+                     class="shift"
+                          style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};"
+                    >
                         <div style="display:flex; align-items:flex-start; gap:12px; flex:1;">
                             <input
                                 type="checkbox"
                                 class="shift-checkbox"
                                 value="${s._id}"
+                                onclick="event.stopPropagation()"
                                 onchange="updateSelectedCount()"
                                 style="width:auto; margin-top:4px;"
                             >
@@ -535,9 +589,9 @@
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:8px;">
-                            <button onclick="openAssignModal('${s._id}')">👤 Assign</button>
-                            <button class="edit-btn" onclick="editShift('${s._id}')">✏️ Edit</button>
-                            <button class="delete-btn" onclick="deleteShift('${s._id}')">🗑 Delete</button>
+                            <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">👤 Assign</button>
+                            <button class="edit-btn" onclick="event.stopPropagation(); editShift('${s._id}')">✏️ Edit</button>
+                            <button class="delete-btn" onclick="event.stopPropagation(); deleteShift('${s._id}')">🗑 Delete</button>
                         </div>
                     </div>
                 `).join('')}
@@ -593,34 +647,44 @@
             notes: document.getElementById('shiftNotes').value
         };
 
-        const res = await fetch('/api/shifts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(shift)
-        });
+        try {
+            const res = await fetch('/api/shifts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(shift)
+            });
 
-        const data = await res.json();
-        alert(data.message);
+            const data = await res.json();
+            alert(data.message || 'Shift posted.');
 
-        document.getElementById('shiftForm').reset();
-        loadShifts();
-        loadOwnerShiftCalendar();
+            document.getElementById('shiftForm').reset();
+            loadShifts();
+            loadOwnerShiftCalendar();
+        } catch (err) {
+            console.error('Post shift error:', err);
+            alert('Failed to post shift.');
+        }
     }
 
     async function deleteShift(id) {
         if (!confirm('Are you sure you want to delete this shift?')) return;
 
-        const res = await fetch(`/api/delete-shift/${id}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
+        try {
+            const res = await fetch(`/api/delete-shift/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
 
-        const data = await res.json();
-        alert(data.message);
+            const data = await res.json();
+            alert(data.message || 'Shift deleted.');
 
-        loadShifts();
-        loadOwnerShiftCalendar();
+            loadShifts();
+            loadOwnerShiftCalendar();
+        } catch (err) {
+            console.error('Delete shift error:', err);
+            alert('Failed to delete shift.');
+        }
     }
 
     async function deleteSelectedShifts() {
@@ -635,18 +699,23 @@
 
         const ids = Array.from(checkboxes).map(cb => cb.value);
 
-        const res = await fetch('/api/delete-multiple-shifts', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ids })
-        });
+        try {
+            const res = await fetch('/api/delete-multiple-shifts', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ids })
+            });
 
-        const data = await res.json();
-        alert(data.message);
+            const data = await res.json();
+            alert(data.message || 'Selected shifts deleted.');
 
-        loadShifts();
-        loadOwnerShiftCalendar();
+            loadShifts();
+            loadOwnerShiftCalendar();
+        } catch (err) {
+            console.error('Delete selected shifts error:', err);
+            alert('Failed to delete selected shifts.');
+        }
     }
 
     async function editShift(id) {
@@ -667,25 +736,30 @@
 
         const notes = prompt('Enter notes:', '');
 
-        const res = await fetch(`/api/edit-shift/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-                date,
-                startTime,
-                expectedEnd,
-                location,
-                position,
-                notes
-            })
-        });
+        try {
+            const res = await fetch(`/api/edit-shift/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    date,
+                    startTime,
+                    expectedEnd,
+                    location,
+                    position,
+                    notes
+                })
+            });
 
-        const data = await res.json();
-        alert(data.message);
+            const data = await res.json();
+            alert(data.message || 'Shift updated.');
 
-        loadShifts();
-        loadOwnerShiftCalendar();
+            loadShifts();
+            loadOwnerShiftCalendar();
+        } catch (err) {
+            console.error('Edit shift error:', err);
+            alert('Failed to edit shift.');
+        }
     }
 
     async function viewSubmittedHours() {
@@ -758,55 +832,63 @@
             return;
         }
 
-        const res = await fetch(`/api/payroll?startDate=${startDate}&endDate=${endDate}`, { credentials: 'include' });
-        const data = await res.json();
-        const container = document.getElementById('payrollContainer');
+        try {
+            const res = await fetch(`/api/payroll?startDate=${startDate}&endDate=${endDate}`, {
+                credentials: 'include'
+            });
 
-        if (!data.length) {
-            container.innerHTML = '<p>No logged hours found for that date range.</p>';
-            return;
-        }
+            const data = await res.json();
+            const container = document.getElementById('payrollContainer');
 
-        container.innerHTML = data.map(worker => `
-            <div class="payroll-card">
-                <h3>${worker.user}</h3>
-                <p><strong>Rate:</strong> $${worker.rate}/hr</p>
+            if (!data.length) {
+                container.innerHTML = '<p>No logged hours found for that date range.</p>';
+                return;
+            }
 
-                <table class="payroll-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Location</th>
-                            <th>Position</th>
-                            <th>Hours</th>
-                            <th>Pay ($)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${worker.entries.map(entry => `
+            container.innerHTML = data.map(worker => `
+                <div class="payroll-card">
+                    <h3>${worker.user}</h3>
+                    <p><strong>Rate:</strong> $${worker.rate}/hr</p>
+
+                    <table class="payroll-table">
+                        <thead>
                             <tr>
-                                <td>${entry.date}</td>
-                                <td>${entry.start}</td>
-                                <td>${entry.end}</td>
-                                <td>${entry.location}</td>
-                                <td>${entry.position}</td>
-                                <td>${entry.hours}</td>
-                                <td>${entry.pay}</td>
+                                <th>Date</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Location</th>
+                                <th>Position</th>
+                                <th>Hours</th>
+                                <th>Pay ($)</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="5"><strong>Total</strong></td>
-                            <td><strong>${worker.totalHours}</strong></td>
-                            <td><strong>$${worker.totalPay}</strong></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        `).join('');
+                        </thead>
+                        <tbody>
+                            ${worker.entries.map(entry => `
+                                <tr>
+                                    <td>${entry.date}</td>
+                                    <td>${entry.start}</td>
+                                    <td>${entry.end}</td>
+                                    <td>${entry.location}</td>
+                                    <td>${entry.position}</td>
+                                    <td>${entry.hours}</td>
+                                    <td>${entry.pay}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="5"><strong>Total</strong></td>
+                                <td><strong>${worker.totalHours}</strong></td>
+                                <td><strong>$${worker.totalPay}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Payroll error:', err);
+            document.getElementById('payrollContainer').innerHTML = '<p>Error loading payroll.</p>';
+        }
     }
 
     async function loadSecurityLogs(date = '', initials = '') {
@@ -840,6 +922,7 @@
             `).join('');
         } catch (err) {
             console.error('Error loading logs:', err);
+            document.getElementById('securityLogContainer').innerHTML = '<p>Error loading security logs.</p>';
         }
     }
 
@@ -905,6 +988,11 @@
                 return;
             }
 
+            if (!res.ok) {
+                console.error('Owner calendar failed:', res.status);
+                return;
+            }
+
             const events = await res.json();
             const calendarEl = document.getElementById('ownerShiftCalendar');
 
@@ -950,7 +1038,7 @@ Status: ${p.status || 'N/A'}${p.status === 'dropped' && p.droppedBy ? ` by ${p.d
 Claimed By: ${p.claimedBy || 'Open'}
 Notes: ${p.notes || 'None'}
 
-Click OK to assign this shift to a worker.`;
+Click OK to assign this shift to a worker or owner.`;
 
                     if (confirm(message)) {
                         openAssignModal(e.id);
