@@ -1055,11 +1055,13 @@ Click OK to assign this shift to a worker or owner.`;
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadShifts();
-        loadSecurityLogs();
-        loadOwnerShiftCalendar();
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('shiftList').innerHTML =
+        '<p>Click "Show All Shifts" to load shifts.</p>';
+
+    loadSecurityLogs();
+    loadOwnerShiftCalendar();
+});
 </script>
 </body>
 </html>
