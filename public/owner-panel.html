@@ -519,10 +519,10 @@
             const shifts = await res.json();
 
             const filtered = shifts.filter(s => {
-                const claimedByText = typeof s.claimedBy === 'object'
-                    ? (s.claimedBy?.username || '')
+           const claimedByText =
+                s.claimedBy && typeof s.claimedBy === 'object'
+                  ? (s.claimedBy.username || '')
                     : (s.claimedBy || '');
-
                 const matchName = !name || claimedByText.toLowerCase().includes(name);
                 const matchDate = !date || s.date === date;
 
@@ -584,8 +584,11 @@
                                 Position: ${s.position || 'Unassigned'}<br>
                                 Status: ${s.status || 'available'}${s.status === 'dropped' && s.droppedBy ? ` by ${s.droppedBy}` : ''}<br>
                                 Notes: ${s.notes || 'None'}<br>
-                                Claimed by: ${typeof s.claimedBy === 'object' ? (s.claimedBy.username || 'Not claimed yet') : (s.claimedBy || 'Not claimed yet')}
-                            </div>
+                                 Claimed by: ${
+    s.claimedBy && typeof s.claimedBy === 'object'
+        ? (s.claimedBy.username || 'Not claimed yet')
+        : (s.claimedBy || 'Not claimed yet')
+}                            </div>
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:8px;">
