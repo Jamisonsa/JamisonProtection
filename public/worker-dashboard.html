@@ -386,49 +386,57 @@
         initialView: 'dayGridMonth',
         height: 'auto',
         events,
-        eventDidMount(info) {
-        if (info.event.extendedProps.type === 'claimed') {
+  eventDidMount(info) {
+    const type = info.event.extendedProps.type;
+
+    if (type === 'my-shift') {
         info.el.style.backgroundColor = '#2e7d32';
         info.el.style.borderColor = '#2e7d32';
-    } else {
+    }
+    else if (type === 'coworker-shift') {
+        info.el.style.backgroundColor = '#f2c744';
+        info.el.style.borderColor = '#f2c744';
+        info.el.style.color = '#111';
+    }
+    else if (type === 'dropped') {
+        info.el.style.backgroundColor = '#ff9800';
+        info.el.style.borderColor = '#ff9800';
+    }
+    else {
         info.el.style.backgroundColor = '#e63946';
         info.el.style.borderColor = '#e63946';
     }
-    },
-        eventClick(info) {
-        const e = info.event;
-        const p = e.extendedProps;
+},
+      eventClick(info) {
+    const e = info.event;
+    const p = e.extendedProps;
 
-        selectedShiftId = e.id;
-        selectedShiftType = p.type || 'available';
+    const message =
+`${e.title}
 
-            const start = e.start;
+Date: ${p.date || 'N/A'}
+Start Time: ${p.startTime || 'N/A'}
+Expected End: ${p.expectedEnd || 'N/A'}
+Location: ${p.location || 'N/A'}
+Position: ${p.position || 'N/A'}
+Status: ${p.status || 'N/A'}
+Working: ${p.claimedBy || 'Open'}
+Dropped By: ${p.droppedBy || 'N/A'}
+Notes: ${p.notes || 'None'}`;
 
-            const formattedDate = p.date || "N/A";
-            const formattedTime = start
-                ? start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                : (p.startTime || "N/A");
-
-        document.getElementById('modalTitle').textContent = e.title;
-        document.getElementById('modalDate').textContent = formattedDate;
-        document.getElementById('modalStart').textContent = formattedTime;
-        document.getElementById('modalEnd').textContent = p.expectedEnd || 'N/A';
-        document.getElementById('modalLocation').textContent = p.location || 'N/A';
-        document.getElementById('modalPosition').textContent = p.position || 'N/A';
-        document.getElementById('modalNotes').textContent = p.notes || 'None';
-
-        const actionBtn = document.getElementById('modalActionBtn');
-
-        if (selectedShiftType === 'claimed') {
-        actionBtn.textContent = 'Drop Shift';
-        actionBtn.style.background = '#b8860b';
-    } else {
-        actionBtn.textContent = 'Claim Shift';
-        actionBtn.style.background = '#e63946';
+    if (p.type === 'available' || p.type === 'dropped') {
+        if (confirm(message + '\n\nClaim this shift?')) {
+            claimShift(e.id);
+        }
     }
-
-        document.getElementById('shiftModal').style.display = 'block';
+    else if (p.type === 'my-shift') {
+        alert(message + '\n\nThis is your shift.');
     }
+    else if (p.type === 'coworker-shift') {
+        alert(message + '\n\nThis shift is assigned to another worker.');
+    }
+}
+
     });
 
         calendar.render();

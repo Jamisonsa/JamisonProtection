@@ -651,22 +651,44 @@ app.post('/api/repost-shift', requireLogin, isOwner, async (req, res) => {
 });
 app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
     try {
-        const availableShifts = await Shift.find({
-            claimedBy: null,
-            status: { $in: ['available', 'dropped'] }
+        const username = req.session.user.username;
+
+        const shifts = await Shift.find({
+            status: { $in: ['available', 'dropped', 'claimed'] }
         }).sort({ date: 1, startTime: 1 });
 
-        const myShifts = await Shift.find({
-            claimedBy: req.session.user.username,
-            status: 'claimed'
-        }).sort({ date: 1, startTime: 1 });
+        const events = shifts.map(shift => {
+            let type = 'available';
+            let color = '#e63946';
+            let title = `Available: ${shift.location}`;
 
-        const events = [
-            ...availableShifts.map(shift => ({
-                id: shift._id,
-                title: `Available: ${shift.location}`,
+            if (shift.status === 'claimed') {
+                if (shift.claimedBy === username) {
+                    type = 'my-shift';
+                    color = '#2e7d32';
+                    title = `My Shift: ${shift.location}`;
+                } else {
+                    type = 'coworker-shift';
+                    color = '#f2c744';
+                    title = `${shift.claimedBy}: ${shift.location}`;
+                }
+            }
+
+            if (shift.status === 'dropped') {
+                type = 'dropped';
+                color = '#ff9800';
+                title = `Dropped/Open: ${shift.location}`;
+            }
+
+            return {
+                id: shift._id.toString(),
+                title,
                 start: `${shift.date}T${shift.startTime}`,
+                backgroundColor: color,
+                borderColor: color,
+                textColor: type === 'coworker-shift' ? '#111' : '#fff',
                 extendedProps: {
+                    type,
                     date: shift.date,
                     startTime: shift.startTime,
                     expectedEnd: shift.expectedEnd || '',
@@ -674,25 +696,11 @@ app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
                     position: shift.position || '',
                     notes: shift.notes || '',
                     status: shift.status,
-                    type: 'available'
+                    claimedBy: shift.claimedBy || null,
+                    droppedBy: shift.droppedBy || null
                 }
-            })),
-            ...myShifts.map(shift => ({
-                id: shift._id,
-                title: `My Shift: ${shift.location}`,
-                start: `${shift.date}T${shift.startTime}`,
-                extendedProps: {
-                    date: shift.date,
-                    startTime: shift.startTime,
-                    expectedEnd: shift.expectedEnd || '',
-                    location: shift.location || '',
-                    position: shift.position || '',
-                    notes: shift.notes || '',
-                    status: shift.status,
-                    type: 'claimed'
-                }
-            }))
-        ];
+            };
+        });
 
         res.json(events);
     } catch (err) {
