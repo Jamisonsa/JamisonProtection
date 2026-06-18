@@ -158,7 +158,12 @@ app.use(session({
 app.use((req, res, next) => {
     res.setHeader(
         "Content-Security-Policy",
-        "default-src 'self' data: https:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https:;"
+        "default-src 'self' data: https:; " +
+        "img-src 'self' data: https:; " +
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+        "connect-src 'self' https:;"
     );
     next();
 });
