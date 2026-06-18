@@ -323,6 +323,36 @@
             <label>Notes:</label>
             <textarea id="shiftNotes" placeholder="Additional notes..."></textarea>
 
+            <hr>
+
+            <label>Repeat Pattern:</label>
+            <select id="repeatType" onchange="toggleCustomDays()">
+                <option value="none">No Repeat</option>
+                <option value="daily">Every Day</option>
+                <option value="weekdays">Monday-Friday</option>
+                <option value="weekends">Saturday-Sunday</option>
+                <option value="weekly">Weekly</option>
+                <option value="custom">Custom Days</option>
+            </select>
+
+            <label>Repeat Until:</label>
+            <input type="date" id="repeatUntil">
+
+            <small style="color:#bbb;">
+                Leave as "No Repeat" for a single shift.
+            </small>
+            <div id="customDaysBox" style="display:none; margin-top:10px;">
+                <strong>Select Days:</strong><br>
+
+                <label><input type="checkbox" class="custom-day" value="1" style="width:auto;"> Monday</label><br>
+                <label><input type="checkbox" class="custom-day" value="2" style="width:auto;"> Tuesday</label><br>
+                <label><input type="checkbox" class="custom-day" value="3" style="width:auto;"> Wednesday</label><br>
+                <label><input type="checkbox" class="custom-day" value="4" style="width:auto;"> Thursday</label><br>
+                <label><input type="checkbox" class="custom-day" value="5" style="width:auto;"> Friday</label><br>
+                <label><input type="checkbox" class="custom-day" value="6" style="width:auto;"> Saturday</label><br>
+                <label><input type="checkbox" class="custom-day" value="0" style="width:auto;"> Sunday</label>
+            </div>
+
             <button type="submit">Post Shift</button>
         </form>
 
@@ -582,8 +612,11 @@
                                 <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
                                 Location: ${s.location || 'Unknown'}<br>
                                 Position: ${s.position || 'Unassigned'}<br>
-                                Status: ${s.status || 'available'}${s.status === 'dropped' && s.droppedBy ? ` by ${s.droppedBy}` : ''}<br>
-                                Notes: ${s.notes || 'None'}<br>
+Status: ${s.status || 'available'}
+${s.status === 'dropped' && s.droppedBy
+    ? `<br>Dropped By: ${s.droppedBy}
+       <br>Reason: ${s.dropReason || 'No reason provided'}`
+    : ''}                                Notes: ${s.notes || 'None'}<br>
                                  Claimed by: ${
     s.claimedBy && typeof s.claimedBy === 'object'
         ? (s.claimedBy.username || 'Not claimed yet')
@@ -637,18 +670,38 @@
             selectAll.checked = checkboxes.length > 0 && checked === checkboxes.length;
         }
     }
+function toggleCustomDays() {
+    const repeatType = document.getElementById('repeatType').value;
 
+    document.getElementById('customDaysBox').style.display =
+        repeatType === 'custom'
+            ? 'block'
+            : 'none';
+}
     async function postShift(event) {
         event.preventDefault();
+const repeatType = document.getElementById('repeatType').value;
+const repeatUntil = document.getElementById('repeatUntil').value;
 
-        const shift = {
-            date: document.getElementById('shiftDate').value,
-            startTime: document.getElementById('shiftStart').value,
-            expectedEnd: document.getElementById('shiftEnd').value,
-            location: document.getElementById('shiftLocation').value,
-            position: document.getElementById('shiftPosition').value,
-            notes: document.getElementById('shiftNotes').value
-        };
+if (repeatType !== 'none' && !repeatUntil) {
+    alert('Please select a Repeat Until date.');
+    return;
+}
+       const shift = {
+    date: document.getElementById('shiftDate').value,
+    startTime: document.getElementById('shiftStart').value,
+    expectedEnd: document.getElementById('shiftEnd').value,
+    location: document.getElementById('shiftLocation').value,
+    position: document.getElementById('shiftPosition').value,
+    notes: document.getElementById('shiftNotes').value,
+
+    repeatType: document.getElementById('repeatType').value,
+    repeatUntil: document.getElementById('repeatUntil').value,
+
+    customDays: Array.from(
+        document.querySelectorAll('.custom-day:checked')
+    ).map(cb => Number(cb.value))
+};
 
         try {
             const res = await fetch('/api/shifts', {
@@ -662,6 +715,7 @@
             alert(data.message || 'Shift posted.');
 
             document.getElementById('shiftForm').reset();
+            document.getElementById('customDaysBox').style.display = 'none';
             loadShifts();
             loadOwnerShiftCalendar();
         } catch (err) {

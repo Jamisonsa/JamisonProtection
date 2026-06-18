@@ -61,8 +61,10 @@ const Shift = mongoose.model('Shift', new mongoose.Schema({
     status: { type: String, enum: ['available','claimed','dropped'], default: 'available' },
     claimedBy: String,
     droppedBy: String,
+    dropReason: String,
     dropTime: String,
-    alertSent: { type: Boolean, default: false } // to prevent repeat 24h texts
+    alertSent: { type: Boolean, default: false },
+    seriesId: String
 }));
 
 
@@ -540,29 +542,116 @@ app.get('/api/security-logs', requireLogin, async (req, res) => {
 
 // ────── Shift Routes ──────
 app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
-    const { date, startTime, expectedEnd, location, position, notes } = req.body;
+    try {
+        const {
+            date,
+            startTime,
+            expectedEnd,
+            location,
+            position,
+            notes,
+            repeatType,
+            repeatUntil,
+            customDays = []
+        } = req.body;
 
-    const shift = new Shift({
-        date,
-        startTime,
-        expectedEnd,
-        location,
-        position,
-        notes,
-        status: 'available',
-        claimedBy: null,
-        droppedBy: null,
-        dropTime: null,
-        alertSent: false
-    });
-    await shift.save();
+        const seriesId = Date.now().toString();
 
-    console.log(`✅ New shift posted by ${req.session.user.username}: ${date} ${startTime} at ${location}`);
+        // No repeat selected
+        if (!repeatType || repeatType === 'none' || !repeatUntil) {
+            const shift = new Shift({
+                date,
+                startTime,
+                expectedEnd,
+                location,
+                position,
+                notes,
+                status: 'available',
+                claimedBy: null,
+                droppedBy: null,
+                dropTime: null,
+                alertSent: false,
+                seriesId: null
+            });
 
-    notifyUsersOfNewShift(shift).catch(() => {});
-    res.json({ message: 'Shift posted' });
+            await shift.save();
+
+            notifyUsersOfNewShift(shift).catch(() => {});
+
+            return res.json({
+                message: 'Shift posted successfully.'
+            });
+        }
+
+        const startDate = new Date(date);
+        const endDate = new Date(repeatUntil);
+
+        let created = 0;
+
+        for (
+            let current = new Date(startDate);
+            current <= endDate;
+            current.setDate(current.getDate() + 1)
+        ) {
+            const day = current.getDay();
+
+            let shouldCreate = false;
+
+            switch (repeatType) {
+                case 'daily':
+                    shouldCreate = true;
+                    break;
+
+                case 'weekdays':
+                    shouldCreate = day >= 1 && day <= 5;
+                    break;
+
+                case 'weekends':
+                    shouldCreate = day === 0 || day === 6;
+                    break;
+
+                case 'weekly':
+                    shouldCreate =
+                        day === startDate.getDay();
+                    break;
+
+                case 'custom':
+                    shouldCreate =
+                        customDays.includes(day);
+                    break;
+            }
+
+            if (!shouldCreate) continue;
+
+            await new Shift({
+                date: current.toISOString().split('T')[0],
+                startTime,
+                expectedEnd,
+                location,
+                position,
+                notes,
+                status: 'available',
+                claimedBy: null,
+                droppedBy: null,
+                dropTime: null,
+                alertSent: false,
+                seriesId
+            }).save();
+
+            created++;
+        }
+
+        res.json({
+            message: `${created} recurring shifts created successfully.`
+        });
+
+    } catch (err) {
+        console.error('Create recurring shifts error:', err);
+        res.status(500).json({
+            message: 'Failed to create shifts.'
+        });
+    }
 });
-
 app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
   const shifts = await Shift.find();
   res.json(shifts);
@@ -582,11 +671,11 @@ app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
 
     res.json({ message: 'Shift claimed successfully' });
 });
-async function notifyOwnersOfDroppedShift(shift) {
+async function notifyOwnersOfDroppedShift(shift, reason) {
     try {
         await transporter.sendMail({
             from: `"Jamison Protection Shifts" <${process.env.CONTACT_EMAIL_USER}>`,
-            to: 'jamisonprotectionllc@gmail.com',
+            to: 'jamisonprotectionllc@gmail.com,deputyfirstclass@gmail.com',
             subject: `⚠️ Shift Dropped by ${shift.droppedBy}`,
             text:
 `A shift was dropped and needs attention.
@@ -598,6 +687,7 @@ Expected End: ${shift.expectedEnd || 'N/A'}
 Location: ${shift.location}
 Position: ${shift.position || 'N/A'}
 Notes: ${shift.notes || 'None'}
+Reason: ${reason}
 
 Status: ${shift.status}
 
@@ -613,7 +703,7 @@ Status: ${shift.status}
 // ────── Drop Shift ──────
 app.post('/api/drop', requireLogin, isWorker, async (req, res) => {
     try {
-        const { shiftId } = req.body;
+        const { shiftId, reason } = req.body;
 
         const shift = await Shift.findById(shiftId);
         if (!shift) return res.status(404).json({ message: 'Shift not found' });
@@ -622,14 +712,15 @@ app.post('/api/drop', requireLogin, isWorker, async (req, res) => {
             return res.status(403).json({ message: 'You can only drop your own shifts' });
         }
 
-        shift.status = 'dropped';
-        shift.droppedBy = req.session.user.username;
-        shift.claimedBy = null;
-        shift.dropTime = new Date();
+   shift.status = 'dropped';
+   shift.droppedBy = req.session.user.username;
+shift.dropReason = reason || 'No reason provided';
+   shift.dropTime = new Date().toLocaleString();
+   shift.claimedBy = null;
 
         await shift.save();
 
-        notifyOwnersOfDroppedShift(shift).catch(err => {
+        notifyOwnersOfDroppedShift(shift, reason).catch(err => {
             console.error('Drop email failed:', err);
         });
 
@@ -702,7 +793,8 @@ app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
                     notes: shift.notes || '',
                     status: shift.status,
                     claimedBy: shift.claimedBy || null,
-                    droppedBy: shift.droppedBy || null
+                    droppedBy: shift.droppedBy || null,
+                    dropReason: shift.dropReason || ''
                 }
             };
         });
@@ -854,7 +946,8 @@ app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
                notes: shift.notes || '',
                status: shift.status,
                claimedBy: shift.claimedBy || null,
-               droppedBy: shift.droppedBy || null
+               droppedBy: shift.droppedBy || null,
+               dropReason: shift.dropReason || ''
            }
         }));
 
