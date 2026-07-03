@@ -1043,7 +1043,7 @@ app.put('/api/edit-shift/:id', requireLogin, isOwner, async (req, res) => {
             'claimedBy',
             'droppedBy',
             'dropReason',
-            'dropTime'
+            'dropTime',
             'alertSent'
         ];
 
