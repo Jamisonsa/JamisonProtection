@@ -624,16 +624,39 @@ ${s.status === 'dropped' && s.droppedBy
 }                            </div>
                         </div>
 
-                        <div style="display:flex; flex-direction:column; gap:8px;">
-                            <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">👤 Assign</button>
-                            <button class="edit-btn" onclick="event.stopPropagation(); editShift('${s._id}')">✏️ Edit</button>
-                            <button class="delete-btn" onclick="event.stopPropagation(); deleteShift('${s._id}')">🗑 Delete</button>
-                        </div>
+                     <div style="display:flex; flex-direction:column; gap:8px;">
+    <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">👤 Assign</button>
+    <button onclick="event.stopPropagation(); unassignShift('${s._id}')">🔓 Unassign</button>
+    <button class="edit-btn" onclick="event.stopPropagation(); editShift('${s._id}')">✏️ Edit</button>
+    <button class="delete-btn" onclick="event.stopPropagation(); deleteShift('${s._id}')">🗑 Delete</button>
+</div>
                     </div>
                 `).join('')}
             </div>
         `;
     }
+async function unassignShift(id) {
+    if (!confirm("Unassign this shift and make it open again?")) return;
+
+    const res = await fetch(`/api/edit-shift/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+    status: "available",
+    claimedBy: null,
+    droppedBy: null,
+    dropReason: "",
+    dropTime: null,
+    alertSent: false
+})
+    });
+
+    const data = await res.json();
+    alert(data.message);
+    loadShifts();
+loadOwnerShiftCalendar();
+}
 
     function showAllShifts() {
         document.getElementById('filterName').value = '';

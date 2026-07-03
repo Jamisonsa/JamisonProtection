@@ -1030,14 +1030,34 @@ app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
     console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
     res.json(shifts);
 });
-// Edit a shift (Owner only)
 app.put('/api/edit-shift/:id', requireLogin, isOwner, async (req, res) => {
     try {
-        const { date, startTime, expectedEnd, location, position, notes, status } = req.body;
+        const allowedUpdates = [
+            'date',
+            'startTime',
+            'expectedEnd',
+            'location',
+            'position',
+            'notes',
+            'status',
+            'claimedBy',
+            'droppedBy',
+            'dropReason',
+            'dropTime'
+            'alertSent'
+        ];
+
+        const updateData = {};
+
+        allowedUpdates.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        });
 
         const updatedShift = await Shift.findByIdAndUpdate(
             req.params.id,
-            { date, startTime, expectedEnd, location, position, notes, status },
+            updateData,
             { new: true }
         );
 

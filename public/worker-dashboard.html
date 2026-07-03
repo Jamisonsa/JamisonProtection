@@ -678,31 +678,32 @@ function toggleSection(sectionId) {
         await loadShiftCalendar();
     }
 
-    async function dropShift(shiftId) {
-    const reason = prompt(
-        "Please enter the reason for dropping this shift:"
-    );
+  async function dropShift(shiftId) {
+    const reason = prompt("Please enter the reason for dropping this shift:");
 
     if (!reason || !reason.trim()) {
         alert("A reason is required to drop a shift.");
         return;
     }
 
-    const res = await fetch(`/api/drop-shift/${shiftId}`, {
+    const res = await fetch('/api/drop', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         credentials: 'include',
         body: JSON.stringify({
+            shiftId,
             reason: reason.trim()
         })
     });
 
     const data = await res.json();
     alert(data.message);
-    loadAvailableShifts();
-    loadWorkerCalendar();
+
+    await loadShifts();
+    await loadMyShifts();
+    await loadShiftCalendar();
 }
 
     async function logout() {
