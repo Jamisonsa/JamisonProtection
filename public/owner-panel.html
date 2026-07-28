@@ -624,11 +624,35 @@ ${s.status === 'dropped' && s.droppedBy
 }                            </div>
                         </div>
 
-                     <div style="display:flex; flex-direction:column; gap:8px;">
-    <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">👤 Assign</button>
-    <button onclick="event.stopPropagation(); unassignShift('${s._id}')">🔓 Unassign</button>
-    <button class="edit-btn" onclick="event.stopPropagation(); editShift('${s._id}')">✏️ Edit</button>
-    <button class="delete-btn" onclick="event.stopPropagation(); deleteShift('${s._id}')">🗑 Delete</button>
+<div style="display:flex; flex-direction:column; gap:8px;">
+    <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">
+        👤 Assign
+    </button>
+
+    <button onclick="event.stopPropagation(); unassignShift('${s._id}')">
+        🔓 Unassign
+    </button>
+
+    <button
+        onclick="event.stopPropagation(); duplicateShift('${s._id}')"
+        style="background:#1976d2;"
+    >
+        📄 Duplicate
+    </button>
+
+    <button
+        class="edit-btn"
+        onclick="event.stopPropagation(); editShift('${s._id}')"
+    >
+        ✏️ Edit
+    </button>
+
+    <button
+        class="delete-btn"
+        onclick="event.stopPropagation(); deleteShift('${s._id}')"
+    >
+        🗑 Delete
+    </button>
 </div>
                     </div>
                 `).join('')}
@@ -746,7 +770,57 @@ if (repeatType !== 'none' && !repeatUntil) {
             alert('Failed to post shift.');
         }
     }
+async function duplicateShift(id) {
+    const answer = prompt(
+        'How many duplicate shifts should be created for this same day?',
+        '1'
+    );
 
+    // User clicked Cancel
+    if (answer === null) return;
+
+    const count = Number(answer);
+
+    if (!Number.isInteger(count) || count < 1 || count > 100) {
+        alert('Enter a whole number between 1 and 100.');
+        return;
+    }
+
+    const confirmed = confirm(
+        `Create ${count} duplicate shift${
+            count === 1 ? '' : 's'
+        } on the same day?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch(`/api/duplicate-shift/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ count })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.message || 'Failed to duplicate shift.');
+            return;
+        }
+
+        alert(data.message);
+
+        loadShifts();
+        loadOwnerShiftCalendar();
+
+    } catch (err) {
+        console.error('Duplicate shift error:', err);
+        alert('Failed to duplicate shift.');
+    }
+}
     async function deleteShift(id) {
         if (!confirm('Are you sure you want to delete this shift?')) return;
 

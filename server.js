@@ -1071,6 +1071,66 @@ app.put('/api/edit-shift/:id', requireLogin, isOwner, async (req, res) => {
         res.status(500).json({ message: 'Failed to update shift' });
     }
 });
+
+// Duplicate an existing shift multiple times on the same day
+app.post('/api/duplicate-shift/:id', requireLogin, isOwner, async (req, res) => {
+    try {
+        const count = Number.parseInt(req.body.count, 10);
+
+        if (!Number.isInteger(count) || count < 1 || count > 100) {
+            return res.status(400).json({
+                message: 'Duplicate amount must be between 1 and 100.'
+            });
+        }
+
+        const original = await Shift.findById(req.params.id);
+
+        if (!original) {
+            return res.status(404).json({
+                message: 'Shift not found.'
+            });
+        }
+
+        const duplicateSeriesId =
+            original.seriesId || `duplicate-${Date.now()}`;
+
+        const copies = Array.from({ length: count }, () => ({
+            date: original.date,
+            startTime: original.startTime,
+            expectedEnd: original.expectedEnd,
+            location: original.location,
+            position: original.position,
+            notes: original.notes,
+            status: 'available',
+            claimedBy: null,
+            droppedBy: null,
+            dropReason: '',
+            dropTime: null,
+            alertSent: false,
+            seriesId: duplicateSeriesId
+        }));
+
+        const created = await Shift.insertMany(copies);
+
+        // Only send one notification for the entire duplicated batch
+        notifyUsersOfNewShift(created[0]).catch(() => {});
+
+        res.json({
+            message: `${created.length} duplicate shift${
+                created.length === 1 ? '' : 's'
+            } created for ${original.date}.`,
+            createdCount: created.length
+        });
+
+    } catch (err) {
+        console.error('Duplicate shift error:', err);
+
+        res.status(500).json({
+            message: 'Failed to duplicate shift.'
+        });
+    }
+});
+
 // Current user's claimed shifts (to show Drop buttons)
 app.get('/api/my-shifts', requireLogin, isWorker, async (req, res) => {
     const shifts = await Shift.find({
