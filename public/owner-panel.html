@@ -453,708 +453,794 @@
 
 <script>
     let ownerCalendar;
-let pastCalendar;
-let selectedAssignShiftId = null;
+    let pastCalendar;
+    let selectedAssignShiftId = null;
+
     function showTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => {
             t.style.display = 'none';
             t.classList.remove('active');
         });
-function showPastCalendar() {
-    showTab('pastCalendar');
 
-    // Render it after the tab becomes visible
-    if (!pastCalendar) {
-        loadPastShiftCalendar();
-    } else {
-        pastCalendar.updateSize();
-    }
-}
         const tab = document.getElementById(tabName + 'Tab');
+
         if (tab) {
             tab.style.display = 'block';
             tab.classList.add('active');
         }
     }
 
-    async function openAssignModal(shiftId) {
-        selectedAssignShiftId = shiftId;
+    function showPastCalendar() {
+        showTab('pastCalendar');
 
-        try {
-            const res = await fetch('/api/users', { credentials: 'include' });
+        // Calendar must be rendered after its tab becomes visible
+        if (!pastCalendar) {
+            loadPastShiftCalendar();
+        } else {
+            pastCalendar.updateSize();
+        }
+    }
 
-            if (!res.ok) {
-                alert('Could not load workers/owners.');
+        async function openAssignModal(shiftId) {
+            selectedAssignShiftId = shiftId;
+
+            try {
+                const res = await fetch('/api/users', { credentials: 'include' });
+
+                if (!res.ok) {
+                    alert('Could not load workers/owners.');
+                    return;
+                }
+
+                const users = await res.json();
+
+                // Owners can now assign shifts to workers OR owners
+                const assignableUsers = users.filter(u => u.role === 'worker' || u.role === 'owner');
+                const select = document.getElementById('assignWorkerSelect');
+
+                if (!assignableUsers.length) {
+                    select.innerHTML = `<option value="">No workers or owners found</option>`;
+                } else {
+                    select.innerHTML = assignableUsers.map(user => `
+                        <option value="${user.username}">
+                            ${user.username} (${user.role})
+                        </option>
+                    `).join('');
+                }
+
+                document.getElementById('assignShiftModal').style.display = 'block';
+            } catch (err) {
+                console.error('Assign modal error:', err);
+                alert('Error loading workers/owners.');
+            }
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assignShiftModal').style.display = 'none';
+            selectedAssignShiftId = null;
+        }
+
+        async function saveAssignedShift() {
+            const username = document.getElementById('assignWorkerSelect').value;
+
+            if (!selectedAssignShiftId || !username) {
+                alert('Please select a worker or owner.');
                 return;
             }
 
-            const users = await res.json();
+            try {
+                const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username })
+                });
 
-            // Owners can now assign shifts to workers OR owners
-            const assignableUsers = users.filter(u => u.role === 'worker' || u.role === 'owner');
-            const select = document.getElementById('assignWorkerSelect');
+                const data = await res.json();
+                alert(data.message || 'Shift assignment complete.');
 
-            if (!assignableUsers.length) {
-                select.innerHTML = `<option value="">No workers or owners found</option>`;
-            } else {
-                select.innerHTML = assignableUsers.map(user => `
-                    <option value="${user.username}">
-                        ${user.username} (${user.role})
-                    </option>
-                `).join('');
+                closeAssignModal();
+                loadShifts();
+                loadOwnerShiftCalendar();
+            } catch (err) {
+                console.error('Assign shift error:', err);
+                alert('Failed to assign shift.');
             }
-
-            document.getElementById('assignShiftModal').style.display = 'block';
-        } catch (err) {
-            console.error('Assign modal error:', err);
-            alert('Error loading workers/owners.');
-        }
-    }
-
-    function closeAssignModal() {
-        document.getElementById('assignShiftModal').style.display = 'none';
-        selectedAssignShiftId = null;
-    }
-
-    async function saveAssignedShift() {
-        const username = document.getElementById('assignWorkerSelect').value;
-
-        if (!selectedAssignShiftId || !username) {
-            alert('Please select a worker or owner.');
-            return;
         }
 
-        try {
-            const res = await fetch(`/api/assign-shift/${selectedAssignShiftId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ username })
-            });
+        async function loadShifts() {
+            try {
+                const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
+                const date = document.getElementById('filterDate')?.value || '';
 
-            const data = await res.json();
-            alert(data.message || 'Shift assignment complete.');
+                const res = await fetch('/api/view-all-shifts', {
+                    credentials: 'include'
+                });
 
-            closeAssignModal();
-            loadShifts();
-            loadOwnerShiftCalendar();
-        } catch (err) {
-            console.error('Assign shift error:', err);
-            alert('Failed to assign shift.');
+                if (res.status === 401) {
+                    location.href = 'login.html';
+                    return;
+                }
+
+                if (!res.ok) {
+                    console.error('Failed loading shifts:', res.status);
+                    document.getElementById('shiftList').innerHTML =
+                        `<p>Error loading shifts (${res.status})</p>`;
+                    return;
+                }
+
+                const shifts = await res.json();
+
+                const filtered = shifts.filter(s => {
+               const claimedByText =
+                    s.claimedBy && typeof s.claimedBy === 'object'
+                      ? (s.claimedBy.username || '')
+                        : (s.claimedBy || '');
+                    const matchName = !name || claimedByText.toLowerCase().includes(name);
+                    const matchDate = !date || s.date === date;
+
+                    return matchName && matchDate;
+                });
+
+                renderShiftList(filtered);
+            } catch (err) {
+                console.error('Failed loading shifts:', err);
+                document.getElementById('shiftList').innerHTML = '<p>Error loading shifts.</p>';
+            }
         }
-    }
 
-    async function loadShifts() {
-        try {
-            const name = document.getElementById('filterName')?.value.trim().toLowerCase() || '';
-            const date = document.getElementById('filterDate')?.value || '';
+        function renderShiftList(shifts) {
+            const container = document.getElementById('shiftList');
 
-            const res = await fetch('/api/view-all-shifts', {
-                credentials: 'include'
-            });
-
-            if (res.status === 401) {
-                location.href = 'login.html';
+            if (!shifts.length) {
+                container.innerHTML = '<p>No shifts found.</p>';
                 return;
             }
 
-            if (!res.ok) {
-                console.error('Failed loading shifts:', res.status);
-                document.getElementById('shiftList').innerHTML =
-                    `<p>Error loading shifts (${res.status})</p>`;
-                return;
-            }
+            container.innerHTML = `
+                <div id="toolbar">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input
+                            type="checkbox"
+                            id="selectAllShifts"
+                            onchange="toggleSelectAllShifts()"
+                            style="width:auto;"
+                        >
+                        Select All Visible
+                    </label>
 
-            const shifts = await res.json();
-
-            const filtered = shifts.filter(s => {
-           const claimedByText =
-                s.claimedBy && typeof s.claimedBy === 'object'
-                  ? (s.claimedBy.username || '')
-                    : (s.claimedBy || '');
-                const matchName = !name || claimedByText.toLowerCase().includes(name);
-                const matchDate = !date || s.date === date;
-
-                return matchName && matchDate;
-            });
-
-            renderShiftList(filtered);
-        } catch (err) {
-            console.error('Failed loading shifts:', err);
-            document.getElementById('shiftList').innerHTML = '<p>Error loading shifts.</p>';
-        }
-    }
-
-    function renderShiftList(shifts) {
-        const container = document.getElementById('shiftList');
-
-        if (!shifts.length) {
-            container.innerHTML = '<p>No shifts found.</p>';
-            return;
-        }
-
-        container.innerHTML = `
-            <div id="toolbar">
-                <label style="display:flex; align-items:center; gap:8px;">
-                    <input
-                        type="checkbox"
-                        id="selectAllShifts"
-                        onchange="toggleSelectAllShifts()"
-                        style="width:auto;"
-                    >
-                    Select All Visible
-                </label>
-
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <span id="selectedCount">0 selected</span>
-                    <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
-                </div>
-            </div>
-
-            <div id="shiftContainer">
-                ${shifts.map(s => `
-                    <div
-                     class="shift"
-                          style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};"
-                    >
-                        <div style="display:flex; align-items:flex-start; gap:12px; flex:1;">
-                            <input
-                                type="checkbox"
-                                class="shift-checkbox"
-                                value="${s._id}"
-                                onclick="event.stopPropagation()"
-                                onchange="updateSelectedCount()"
-                                style="width:auto; margin-top:4px;"
-                            >
-
-                            <div>
-                                <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
-                                Location: ${s.location || 'Unknown'}<br>
-                                Position: ${s.position || 'Unassigned'}<br>
-Status: ${s.status || 'available'}
-${s.status === 'dropped' && s.droppedBy
-    ? `<br>Dropped By: ${s.droppedBy}
-       <br>Reason: ${s.dropReason || 'No reason provided'}`
-    : ''}                                Notes: ${s.notes || 'None'}<br>
-                                 Claimed by: ${
-    s.claimedBy && typeof s.claimedBy === 'object'
-        ? (s.claimedBy.username || 'Not claimed yet')
-        : (s.claimedBy || 'Not claimed yet')
-}                            </div>
-                        </div>
-
-<div style="display:flex; flex-direction:column; gap:8px;">
-    <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">
-        👤 Assign
-    </button>
-
-    <button onclick="event.stopPropagation(); unassignShift('${s._id}')">
-        🔓 Unassign
-    </button>
-
-    <button
-        onclick="event.stopPropagation(); duplicateShift('${s._id}')"
-        style="background:#1976d2;"
-    >
-        📄 Duplicate
-    </button>
-
-    <button
-        class="edit-btn"
-        onclick="event.stopPropagation(); editShift('${s._id}')"
-    >
-        ✏️ Edit
-    </button>
-
-    <button
-        class="delete-btn"
-        onclick="event.stopPropagation(); deleteShift('${s._id}')"
-    >
-        🗑 Delete
-    </button>
-</div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span id="selectedCount">0 selected</span>
+                        <button onclick="deleteSelectedShifts()">🗑 Delete Selected</button>
                     </div>
-                `).join('')}
-            </div>
-        `;
-    }
-async function unassignShift(id) {
-    if (!confirm("Unassign this shift and make it open again?")) return;
+                </div>
 
-    const res = await fetch(`/api/edit-shift/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-    status: "available",
-    claimedBy: null,
-    droppedBy: null,
-    dropReason: "",
-    dropTime: null,
-    alertSent: false
-})
-    });
+                <div id="shiftContainer">
+                    ${shifts.map(s => `
+                        <div
+                         class="shift"
+                              style="display:flex; justify-content:space-between; align-items:flex-start; gap:15px; border-left:5px solid ${s.claimedBy ? '#e63946' : '#444'};"
+                        >
+                            <div style="display:flex; align-items:flex-start; gap:12px; flex:1;">
+                                <input
+                                    type="checkbox"
+                                    class="shift-checkbox"
+                                    value="${s._id}"
+                                    onclick="event.stopPropagation()"
+                                    onchange="updateSelectedCount()"
+                                    style="width:auto; margin-top:4px;"
+                                >
 
-    const data = await res.json();
-    alert(data.message);
-    loadShifts();
-loadOwnerShiftCalendar();
-}
+                                <div>
+                                    <strong>${s.date || 'No date'} — ${s.startTime || 'N/A'} to ${s.expectedEnd || 'N/A'}</strong><br>
+                                    Location: ${s.location || 'Unknown'}<br>
+                                    Position: ${s.position || 'Unassigned'}<br>
+    Status: ${s.status || 'available'}
+    ${s.status === 'dropped' && s.droppedBy
+        ? `<br>Dropped By: ${s.droppedBy}
+           <br>Reason: ${s.dropReason || 'No reason provided'}`
+        : ''}                                Notes: ${s.notes || 'None'}<br>
+                                     Claimed by: ${
+        s.claimedBy && typeof s.claimedBy === 'object'
+            ? (s.claimedBy.username || 'Not claimed yet')
+            : (s.claimedBy || 'Not claimed yet')
+    }                            </div>
+                            </div>
 
-    function showAllShifts() {
-        document.getElementById('filterName').value = '';
-        document.getElementById('filterDate').value = '';
-        loadShifts();
-    }
+    <div style="display:flex; flex-direction:column; gap:8px;">
+        <button onclick="event.stopPropagation(); openAssignModal('${s._id}')">
+            👤 Assign
+        </button>
 
-    function clearFilters() {
-        document.getElementById('filterName').value = '';
-        document.getElementById('filterDate').value = '';
-        loadShifts();
-    }
+        <button onclick="event.stopPropagation(); unassignShift('${s._id}')">
+            🔓 Unassign
+        </button>
 
-    function toggleSelectAllShifts() {
-        const selectAll = document.getElementById('selectAllShifts');
-        const checkboxes = document.querySelectorAll('.shift-checkbox');
+        <button
+            onclick="event.stopPropagation(); duplicateShift('${s._id}')"
+            style="background:#1976d2;"
+        >
+            📄 Duplicate
+        </button>
 
-        checkboxes.forEach(cb => {
-            cb.checked = selectAll.checked;
-        });
+        <button
+            class="edit-btn"
+            onclick="event.stopPropagation(); editShift('${s._id}')"
+        >
+            ✏️ Edit
+        </button>
 
-        updateSelectedCount();
-    }
-
-    function updateSelectedCount() {
-        const checkboxes = document.querySelectorAll('.shift-checkbox');
-        const checked = document.querySelectorAll('.shift-checkbox:checked').length;
-        const counter = document.getElementById('selectedCount');
-        const selectAll = document.getElementById('selectAllShifts');
-
-        if (counter) counter.textContent = `${checked} selected`;
-
-        if (selectAll) {
-            selectAll.checked = checkboxes.length > 0 && checked === checkboxes.length;
+        <button
+            class="delete-btn"
+            onclick="event.stopPropagation(); deleteShift('${s._id}')"
+        >
+            🗑 Delete
+        </button>
+    </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
         }
-    }
-function toggleCustomDays() {
-    const repeatType = document.getElementById('repeatType').value;
+    async function unassignShift(id) {
+        if (!confirm("Unassign this shift and make it open again?")) return;
 
-    document.getElementById('customDaysBox').style.display =
-        repeatType === 'custom'
-            ? 'block'
-            : 'none';
-}
-    async function postShift(event) {
-        event.preventDefault();
-const repeatType = document.getElementById('repeatType').value;
-const repeatUntil = document.getElementById('repeatUntil').value;
-
-if (repeatType !== 'none' && !repeatUntil) {
-    alert('Please select a Repeat Until date.');
-    return;
-}
-       const shift = {
-    date: document.getElementById('shiftDate').value,
-    startTime: document.getElementById('shiftStart').value,
-    expectedEnd: document.getElementById('shiftEnd').value,
-    location: document.getElementById('shiftLocation').value,
-    position: document.getElementById('shiftPosition').value,
-    notes: document.getElementById('shiftNotes').value,
-
-    repeatType: document.getElementById('repeatType').value,
-    repeatUntil: document.getElementById('repeatUntil').value,
-
-    customDays: Array.from(
-        document.querySelectorAll('.custom-day:checked')
-    ).map(cb => Number(cb.value))
-};
-
-        try {
-            const res = await fetch('/api/shifts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(shift)
-            });
-
-            const data = await res.json();
-            alert(data.message || 'Shift posted.');
-
-            document.getElementById('shiftForm').reset();
-            document.getElementById('customDaysBox').style.display = 'none';
-            loadShifts();
-            loadOwnerShiftCalendar();
-        } catch (err) {
-            console.error('Post shift error:', err);
-            alert('Failed to post shift.');
-        }
-    }
-async function duplicateShift(id) {
-    const answer = prompt(
-        'How many duplicate shifts should be created for this same day?',
-        '1'
-    );
-
-    // User clicked Cancel
-    if (answer === null) return;
-
-    const count = Number(answer);
-
-    if (!Number.isInteger(count) || count < 1 || count > 100) {
-        alert('Enter a whole number between 1 and 100.');
-        return;
-    }
-
-    const confirmed = confirm(
-        `Create ${count} duplicate shift${
-            count === 1 ? '' : 's'
-        } on the same day?`
-    );
-
-    if (!confirmed) return;
-
-    try {
-        const res = await fetch(`/api/duplicate-shift/${id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify({ count })
+        const res = await fetch(`/api/edit-shift/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+        status: "available",
+        claimedBy: null,
+        droppedBy: null,
+        dropReason: "",
+        dropTime: null,
+        alertSent: false
+    })
         });
 
         const data = await res.json();
-
-        if (!res.ok) {
-            alert(data.message || 'Failed to duplicate shift.');
-            return;
-        }
-
         alert(data.message);
-
         loadShifts();
-        loadOwnerShiftCalendar();
-
-    } catch (err) {
-        console.error('Duplicate shift error:', err);
-        alert('Failed to duplicate shift.');
+    loadOwnerShiftCalendar();
     }
-}
-    async function deleteShift(id) {
-        if (!confirm('Are you sure you want to delete this shift?')) return;
 
-        try {
-            const res = await fetch(`/api/delete-shift/${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
+        function showAllShifts() {
+            document.getElementById('filterName').value = '';
+            document.getElementById('filterDate').value = '';
+            loadShifts();
+        }
+
+        function clearFilters() {
+            document.getElementById('filterName').value = '';
+            document.getElementById('filterDate').value = '';
+            loadShifts();
+        }
+
+        function toggleSelectAllShifts() {
+            const selectAll = document.getElementById('selectAllShifts');
+            const checkboxes = document.querySelectorAll('.shift-checkbox');
+
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll.checked;
             });
 
-            const data = await res.json();
-            alert(data.message || 'Shift deleted.');
-
-            loadShifts();
-            loadOwnerShiftCalendar();
-        } catch (err) {
-            console.error('Delete shift error:', err);
-            alert('Failed to delete shift.');
+            updateSelectedCount();
         }
+
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.shift-checkbox');
+            const checked = document.querySelectorAll('.shift-checkbox:checked').length;
+            const counter = document.getElementById('selectedCount');
+            const selectAll = document.getElementById('selectAllShifts');
+
+            if (counter) counter.textContent = `${checked} selected`;
+
+            if (selectAll) {
+                selectAll.checked = checkboxes.length > 0 && checked === checkboxes.length;
+            }
+        }
+    function toggleCustomDays() {
+        const repeatType = document.getElementById('repeatType').value;
+
+        document.getElementById('customDaysBox').style.display =
+            repeatType === 'custom'
+                ? 'block'
+                : 'none';
     }
+        async function postShift(event) {
+            event.preventDefault();
+    const repeatType = document.getElementById('repeatType').value;
+    const repeatUntil = document.getElementById('repeatUntil').value;
 
-    async function deleteSelectedShifts() {
-        const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
+    if (repeatType !== 'none' && !repeatUntil) {
+        alert('Please select a Repeat Until date.');
+        return;
+    }
+           const shift = {
+        date: document.getElementById('shiftDate').value,
+        startTime: document.getElementById('shiftStart').value,
+        expectedEnd: document.getElementById('shiftEnd').value,
+        location: document.getElementById('shiftLocation').value,
+        position: document.getElementById('shiftPosition').value,
+        notes: document.getElementById('shiftNotes').value,
 
-        if (checkboxes.length === 0) {
-            alert('No shifts selected.');
+        repeatType: document.getElementById('repeatType').value,
+        repeatUntil: document.getElementById('repeatUntil').value,
+
+        customDays: Array.from(
+            document.querySelectorAll('.custom-day:checked')
+        ).map(cb => Number(cb.value))
+    };
+
+            try {
+                const res = await fetch('/api/shifts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(shift)
+                });
+
+                const data = await res.json();
+                alert(data.message || 'Shift posted.');
+
+                document.getElementById('shiftForm').reset();
+                document.getElementById('customDaysBox').style.display = 'none';
+                loadShifts();
+                loadOwnerShiftCalendar();
+            } catch (err) {
+                console.error('Post shift error:', err);
+                alert('Failed to post shift.');
+            }
+        }
+    async function duplicateShift(id) {
+        const answer = prompt(
+            'How many duplicate shifts should be created for this same day?',
+            '1'
+        );
+
+        // User clicked Cancel
+        if (answer === null) return;
+
+        const count = Number(answer);
+
+        if (!Number.isInteger(count) || count < 1 || count > 100) {
+            alert('Enter a whole number between 1 and 100.');
             return;
         }
 
-        if (!confirm(`Delete ${checkboxes.length} selected shift(s)?`)) return;
+        const confirmed = confirm(
+            `Create ${count} duplicate shift${
+                count === 1 ? '' : 's'
+            } on the same day?`
+        );
 
-        const ids = Array.from(checkboxes).map(cb => cb.value);
+        if (!confirmed) return;
 
         try {
-            const res = await fetch('/api/delete-multiple-shifts', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+            const res = await fetch(`/api/duplicate-shift/${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 credentials: 'include',
-                body: JSON.stringify({ ids })
+                body: JSON.stringify({ count })
             });
 
             const data = await res.json();
-            alert(data.message || 'Selected shifts deleted.');
-
-            loadShifts();
-            loadOwnerShiftCalendar();
-        } catch (err) {
-            console.error('Delete selected shifts error:', err);
-            alert('Failed to delete selected shifts.');
-        }
-    }
-
-    async function editShift(id) {
-        const date = prompt('Enter new shift date (YYYY-MM-DD):');
-        if (!date) return;
-
-        const startTime = prompt('Enter new start time (HH:MM):');
-        if (!startTime) return;
-
-        const expectedEnd = prompt('Enter expected end time:');
-        if (!expectedEnd) return;
-
-        const location = prompt('Enter location:', 'John Carroll School');
-        if (!location) return;
-
-        const position = prompt('Enter work position:');
-        if (!position) return;
-
-        const notes = prompt('Enter notes:', '');
-
-        try {
-            const res = await fetch(`/api/edit-shift/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    date,
-                    startTime,
-                    expectedEnd,
-                    location,
-                    position,
-                    notes
-                })
-            });
-
-            const data = await res.json();
-            alert(data.message || 'Shift updated.');
-
-            loadShifts();
-            loadOwnerShiftCalendar();
-        } catch (err) {
-            console.error('Edit shift error:', err);
-            alert('Failed to edit shift.');
-        }
-    }
-
-    async function viewSubmittedHours() {
-        const container = document.getElementById('submittedHoursContainer');
-        const content = document.getElementById('submittedHoursContent');
-
-        container.style.display = 'block';
-        content.innerHTML = '<p>Loading submitted logs...</p>';
-
-        try {
-            const res = await fetch('/api/view-logs', { credentials: 'include' });
 
             if (!res.ok) {
-                content.innerHTML = '<p>Failed to load logs.</p>';
+                alert(data.message || 'Failed to duplicate shift.');
                 return;
             }
 
-            const data = await res.json();
+            alert(data.message);
 
-            if (!Object.keys(data).length) {
-                content.innerHTML = '<p>No submitted hours found.</p>';
-                return;
-            }
+            loadShifts();
+            loadOwnerShiftCalendar();
 
-            content.innerHTML = Object.entries(data).map(([user, logs]) => `
-                <div class="payroll-card">
-                    <h3>${user}</h3>
-                    <table class="payroll-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th>Location</th>
-                                <th>Position</th>
-                                <th>Hours</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${logs.map(l => `
-                                <tr>
-                                    <td>${l.date}</td>
-                                    <td>${l.startTime}</td>
-                                    <td>${l.endTime}</td>
-                                    <td>${l.location}</td>
-                                    <td>${l.position}</td>
-                                    <td>${l.hours}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `).join('');
         } catch (err) {
-            console.error('Error fetching logs:', err);
-            content.innerHTML = '<p>Error loading logs.</p>';
+            console.error('Duplicate shift error:', err);
+            alert('Failed to duplicate shift.');
         }
     }
+        async function deleteShift(id) {
+            if (!confirm('Are you sure you want to delete this shift?')) return;
 
-    function closeSubmittedHours() {
-        document.getElementById('submittedHoursContainer').style.display = 'none';
-    }
+            try {
+                const res = await fetch(`/api/delete-shift/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
 
-    async function loadPayroll() {
-        const startDate = document.getElementById('payrollStart').value;
-        const endDate = document.getElementById('payrollEnd').value;
+                const data = await res.json();
+                alert(data.message || 'Shift deleted.');
 
-        if (!startDate || !endDate) {
-            alert('Please select a start and end date.');
-            return;
+                loadShifts();
+                loadOwnerShiftCalendar();
+            } catch (err) {
+                console.error('Delete shift error:', err);
+                alert('Failed to delete shift.');
+            }
         }
 
-        try {
-            const res = await fetch(`/api/payroll?startDate=${startDate}&endDate=${endDate}`, {
+        async function deleteSelectedShifts() {
+            const checkboxes = document.querySelectorAll('.shift-checkbox:checked');
+
+            if (checkboxes.length === 0) {
+                alert('No shifts selected.');
+                return;
+            }
+
+            if (!confirm(`Delete ${checkboxes.length} selected shift(s)?`)) return;
+
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const res = await fetch('/api/delete-multiple-shifts', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ids })
+                });
+
+                const data = await res.json();
+                alert(data.message || 'Selected shifts deleted.');
+
+                loadShifts();
+                loadOwnerShiftCalendar();
+            } catch (err) {
+                console.error('Delete selected shifts error:', err);
+                alert('Failed to delete selected shifts.');
+            }
+        }
+
+        async function editShift(id) {
+            const date = prompt('Enter new shift date (YYYY-MM-DD):');
+            if (!date) return;
+
+            const startTime = prompt('Enter new start time (HH:MM):');
+            if (!startTime) return;
+
+            const expectedEnd = prompt('Enter expected end time:');
+            if (!expectedEnd) return;
+
+            const location = prompt('Enter location:', 'John Carroll School');
+            if (!location) return;
+
+            const position = prompt('Enter work position:');
+            if (!position) return;
+
+            const notes = prompt('Enter notes:', '');
+
+            try {
+                const res = await fetch(`/api/edit-shift/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        date,
+                        startTime,
+                        expectedEnd,
+                        location,
+                        position,
+                        notes
+                    })
+                });
+
+                const data = await res.json();
+                alert(data.message || 'Shift updated.');
+
+                loadShifts();
+                loadOwnerShiftCalendar();
+            } catch (err) {
+                console.error('Edit shift error:', err);
+                alert('Failed to edit shift.');
+            }
+        }
+
+        async function viewSubmittedHours() {
+            const container = document.getElementById('submittedHoursContainer');
+            const content = document.getElementById('submittedHoursContent');
+
+            container.style.display = 'block';
+            content.innerHTML = '<p>Loading submitted logs...</p>';
+
+            try {
+                const res = await fetch('/api/view-logs', { credentials: 'include' });
+
+                if (!res.ok) {
+                    content.innerHTML = '<p>Failed to load logs.</p>';
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (!Object.keys(data).length) {
+                    content.innerHTML = '<p>No submitted hours found.</p>';
+                    return;
+                }
+
+                content.innerHTML = Object.entries(data).map(([user, logs]) => `
+                    <div class="payroll-card">
+                        <h3>${user}</h3>
+                        <table class="payroll-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                    <th>Location</th>
+                                    <th>Position</th>
+                                    <th>Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${logs.map(l => `
+                                    <tr>
+                                        <td>${l.date}</td>
+                                        <td>${l.startTime}</td>
+                                        <td>${l.endTime}</td>
+                                        <td>${l.location}</td>
+                                        <td>${l.position}</td>
+                                        <td>${l.hours}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error fetching logs:', err);
+                content.innerHTML = '<p>Error loading logs.</p>';
+            }
+        }
+
+        function closeSubmittedHours() {
+            document.getElementById('submittedHoursContainer').style.display = 'none';
+        }
+
+        async function loadPayroll() {
+            const startDate = document.getElementById('payrollStart').value;
+            const endDate = document.getElementById('payrollEnd').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select a start and end date.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/payroll?startDate=${startDate}&endDate=${endDate}`, {
+                    credentials: 'include'
+                });
+
+                const data = await res.json();
+                const container = document.getElementById('payrollContainer');
+
+                if (!data.length) {
+                    container.innerHTML = '<p>No logged hours found for that date range.</p>';
+                    return;
+                }
+
+                container.innerHTML = data.map(worker => `
+                    <div class="payroll-card">
+                        <h3>${worker.user}</h3>
+                        <p><strong>Rate:</strong> $${worker.rate}/hr</p>
+
+                        <table class="payroll-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                    <th>Location</th>
+                                    <th>Position</th>
+                                    <th>Hours</th>
+                                    <th>Pay ($)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${worker.entries.map(entry => `
+                                    <tr>
+                                        <td>${entry.date}</td>
+                                        <td>${entry.start}</td>
+                                        <td>${entry.end}</td>
+                                        <td>${entry.location}</td>
+                                        <td>${entry.position}</td>
+                                        <td>${entry.hours}</td>
+                                        <td>${entry.pay}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="5"><strong>Total</strong></td>
+                                    <td><strong>${worker.totalHours}</strong></td>
+                                    <td><strong>$${worker.totalPay}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Payroll error:', err);
+                document.getElementById('payrollContainer').innerHTML = '<p>Error loading payroll.</p>';
+            }
+        }
+
+        async function loadSecurityLogs(date = '', initials = '') {
+            try {
+                let url = '/api/security-logs';
+                const params = [];
+
+                if (date) params.push(`date=${encodeURIComponent(date)}`);
+                if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
+                if (params.length) url += '?' + params.join('&');
+
+                const res = await fetch(url, { credentials: 'include' });
+                const logs = await res.json();
+
+                const container = document.getElementById('securityLogContainer');
+
+                if (!logs.length) {
+                    container.innerHTML = '<p>No logs found.</p>';
+                    return;
+                }
+
+                container.innerHTML = logs.map(log => `
+                    <div class="shift" style="border-left:4px solid #f2c744;">
+                        <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
+                        ${log.description}<br>
+                        <small>
+                            Initials: ${log.initials} |
+                            Submitted by: ${typeof log.submittedBy === 'object' ? (log.submittedBy.username || 'Unknown') : log.submittedBy}
+                        </small>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading logs:', err);
+                document.getElementById('securityLogContainer').innerHTML = '<p>Error loading security logs.</p>';
+            }
+        }
+
+        function filterSecurityLogs() {
+            const date = document.getElementById('filterDateLog').value;
+            const initials = document.getElementById('filterInitialsLog').value;
+            loadSecurityLogs(date, initials);
+        }
+
+        function clearSecurityFilters() {
+            document.getElementById('filterDateLog').value = '';
+            document.getElementById('filterInitialsLog').value = '';
+            loadSecurityLogs();
+        }
+
+        function exportSecurityLogs() {
+            const date = document.getElementById('filterDateLog').value;
+            const initials = document.getElementById('filterInitialsLog').value;
+
+            let url = '/api/security-logs?format=csv';
+
+            if (date) url += `&date=${encodeURIComponent(date)}`;
+            if (initials) url += `&initials=${encodeURIComponent(initials)}`;
+
+            window.open(url, '_blank');
+        }
+
+        function logout() {
+            fetch('/logout', {
+                method: 'POST',
+                credentials: 'include'
+            }).then(() => location.href = 'login.html');
+        }
+
+        function switchToWorker() {
+            fetch('/api/switch-to-worker', {
+                method: 'POST',
+                credentials: 'include'
+            })
+                .then(res => res.ok ? location.href = 'worker-dashboard.html' : alert('Only owner can switch.'))
+                .catch(err => alert('Switch failed: ' + err.message));
+        }
+
+        async function goToAdmin() {
+            const res = await fetch('/api/verify-owner', {
+                method: 'GET',
                 credentials: 'include'
             });
 
-            const data = await res.json();
-            const container = document.getElementById('payrollContainer');
-
-            if (!data.length) {
-                container.innerHTML = '<p>No logged hours found for that date range.</p>';
-                return;
+            if (res.ok) {
+                window.location.href = 'admin-panel.html';
+            } else {
+                alert('Access denied');
             }
-
-            container.innerHTML = data.map(worker => `
-                <div class="payroll-card">
-                    <h3>${worker.user}</h3>
-                    <p><strong>Rate:</strong> $${worker.rate}/hr</p>
-
-                    <table class="payroll-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th>Location</th>
-                                <th>Position</th>
-                                <th>Hours</th>
-                                <th>Pay ($)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${worker.entries.map(entry => `
-                                <tr>
-                                    <td>${entry.date}</td>
-                                    <td>${entry.start}</td>
-                                    <td>${entry.end}</td>
-                                    <td>${entry.location}</td>
-                                    <td>${entry.position}</td>
-                                    <td>${entry.hours}</td>
-                                    <td>${entry.pay}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                        <tfoot>
-                            <tr class="total-row">
-                                <td colspan="5"><strong>Total</strong></td>
-                                <td><strong>${worker.totalHours}</strong></td>
-                                <td><strong>$${worker.totalPay}</strong></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            `).join('');
-        } catch (err) {
-            console.error('Payroll error:', err);
-            document.getElementById('payrollContainer').innerHTML = '<p>Error loading payroll.</p>';
         }
-    }
 
-    async function loadSecurityLogs(date = '', initials = '') {
-        try {
-            let url = '/api/security-logs';
-            const params = [];
+        async function loadOwnerShiftCalendar() {
+            try {
+                const res = await fetch('/api/owner-calendar', { credentials: 'include' });
 
-            if (date) params.push(`date=${encodeURIComponent(date)}`);
-            if (initials) params.push(`initials=${encodeURIComponent(initials)}`);
-            if (params.length) url += '?' + params.join('&');
+                if (res.status === 401) {
+                    location.href = 'login.html';
+                    return;
+                }
 
-            const res = await fetch(url, { credentials: 'include' });
-            const logs = await res.json();
+                if (!res.ok) {
+                    console.error('Owner calendar failed:', res.status);
+                    return;
+                }
 
-            const container = document.getElementById('securityLogContainer');
+                const events = await res.json();
+                const calendarEl = document.getElementById('ownerShiftCalendar');
 
-            if (!logs.length) {
-                container.innerHTML = '<p>No logs found.</p>';
-                return;
+                if (ownerCalendar) {
+                    ownerCalendar.destroy();
+                }
+
+                ownerCalendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    height: 'auto',
+                    events,
+
+                    eventDidMount(info) {
+                        const status = info.event.extendedProps.status;
+                        const claimedBy = info.event.extendedProps.claimedBy;
+
+                        if (status === 'claimed' && claimedBy) {
+                            info.el.style.backgroundColor = '#2e7d32';
+                            info.el.style.borderColor = '#2e7d32';
+                        } else if (status === 'dropped') {
+                            info.el.style.backgroundColor = '#f2c744';
+                            info.el.style.borderColor = '#f2c744';
+                            info.el.style.color = '#111';
+                        } else {
+                            info.el.style.backgroundColor = '#e63946';
+                            info.el.style.borderColor = '#e63946';
+                        }
+                    },
+
+                    eventClick(info) {
+                        const e = info.event;
+                        const p = e.extendedProps;
+
+                        const message =
+    `${e.title}
+
+    Date: ${p.date || 'N/A'}
+    Start Time: ${p.startTime || 'N/A'}
+    Expected End: ${p.expectedEnd || 'N/A'}
+    Location: ${p.location || 'N/A'}
+    Position: ${p.position || 'N/A'}
+    Status: ${p.status || 'N/A'}${p.status === 'dropped' && p.droppedBy ? ` by ${p.droppedBy}` : ''}
+    Claimed By: ${p.claimedBy || 'Open'}
+    Notes: ${p.notes || 'None'}
+
+    Click OK to assign this shift to a worker or owner.`;
+
+                        if (confirm(message)) {
+                            openAssignModal(e.id);
+                        }
+                    }
+                });
+
+                ownerCalendar.render();
+            } catch (err) {
+                console.error('Failed to load owner shift calendar:', err);
             }
-
-            container.innerHTML = logs.map(log => `
-                <div class="shift" style="border-left:4px solid #f2c744;">
-                    <strong>${log.date} ${log.time}</strong> — <em>${log.location}</em><br>
-                    ${log.description}<br>
-                    <small>
-                        Initials: ${log.initials} |
-                        Submitted by: ${typeof log.submittedBy === 'object' ? (log.submittedBy.username || 'Unknown') : log.submittedBy}
-                    </small>
-                </div>
-            `).join('');
-        } catch (err) {
-            console.error('Error loading logs:', err);
-            document.getElementById('securityLogContainer').innerHTML = '<p>Error loading security logs.</p>';
         }
-    }
 
-    function filterSecurityLogs() {
-        const date = document.getElementById('filterDateLog').value;
-        const initials = document.getElementById('filterInitialsLog').value;
-        loadSecurityLogs(date, initials);
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('shiftList').innerHTML =
+            '<p>Click "Show All Shifts" to load shifts.</p>';
 
-    function clearSecurityFilters() {
-        document.getElementById('filterDateLog').value = '';
-        document.getElementById('filterInitialsLog').value = '';
         loadSecurityLogs();
-    }
-
-    function exportSecurityLogs() {
-        const date = document.getElementById('filterDateLog').value;
-        const initials = document.getElementById('filterInitialsLog').value;
-
-        let url = '/api/security-logs?format=csv';
-
-        if (date) url += `&date=${encodeURIComponent(date)}`;
-        if (initials) url += `&initials=${encodeURIComponent(initials)}`;
-
-        window.open(url, '_blank');
-    }
-
-    function logout() {
-        fetch('/logout', {
-            method: 'POST',
-            credentials: 'include'
-        }).then(() => location.href = 'login.html');
-    }
-
-    function switchToWorker() {
-        fetch('/api/switch-to-worker', {
-            method: 'POST',
-            credentials: 'include'
-        })
-            .then(res => res.ok ? location.href = 'worker-dashboard.html' : alert('Only owner can switch.'))
-            .catch(err => alert('Switch failed: ' + err.message));
-    }
-
-    async function goToAdmin() {
-        const res = await fetch('/api/verify-owner', {
-            method: 'GET',
-            credentials: 'include'
-        });
-
-        if (res.ok) {
-            window.location.href = 'admin-panel.html';
-        } else {
-            alert('Access denied');
-        }
-    }
-
-    async function loadOwnerShiftCalendar() {
+        loadOwnerShiftCalendar();
+    });
+        async function loadPastShiftCalendar() {
         try {
-            const res = await fetch('/api/owner-calendar', { credentials: 'include' });
+            const res = await fetch('/api/past-calendar', {
+        credentials: 'include'
+    });
 
             if (res.status === 401) {
                 location.href = 'login.html';
@@ -1162,33 +1248,75 @@ async function duplicateShift(id) {
             }
 
             if (!res.ok) {
-                console.error('Owner calendar failed:', res.status);
+                console.error('Past calendar failed:', res.status);
                 return;
             }
 
             const events = await res.json();
-            const calendarEl = document.getElementById('ownerShiftCalendar');
 
-            if (ownerCalendar) {
-                ownerCalendar.destroy();
+            // Get today's date in local YYYY-MM-DD format
+            const now = new Date();
+
+            const today =
+                now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0');
+
+            // Only keep shifts BEFORE today
+            const pastEvents = events.filter(event => {
+                const shiftDate =
+                    event.extendedProps?.date ||
+                    event.start?.substring(0, 10);
+
+                return shiftDate && shiftDate < today;
+            });
+
+            const calendarEl =
+                document.getElementById('pastShiftCalendar');
+
+            if (pastCalendar) {
+                pastCalendar.destroy();
             }
 
-            ownerCalendar = new FullCalendar.Calendar(calendarEl, {
+            pastCalendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 height: 'auto',
-                events,
+
+                // Start the calendar around the most recent past shifts
+                initialDate: pastEvents.length
+                    ? pastEvents
+                        .map(e =>
+                            e.extendedProps?.date ||
+                            e.start?.substring(0, 10)
+                        )
+                        .sort()
+                        .reverse()[0]
+                    : undefined,
+
+                events: pastEvents,
+
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth'
+                },
 
                 eventDidMount(info) {
-                    const status = info.event.extendedProps.status;
-                    const claimedBy = info.event.extendedProps.claimedBy;
+                    const status =
+                        info.event.extendedProps.status;
+
+                    const claimedBy =
+                        info.event.extendedProps.claimedBy;
 
                     if (status === 'claimed' && claimedBy) {
                         info.el.style.backgroundColor = '#2e7d32';
                         info.el.style.borderColor = '#2e7d32';
+
                     } else if (status === 'dropped') {
                         info.el.style.backgroundColor = '#f2c744';
                         info.el.style.borderColor = '#f2c744';
                         info.el.style.color = '#111';
+
                     } else {
                         info.el.style.backgroundColor = '#e63946';
                         info.el.style.borderColor = '#e63946';
@@ -1199,154 +1327,30 @@ async function duplicateShift(id) {
                     const e = info.event;
                     const p = e.extendedProps;
 
-                    const message =
-`${e.title}
+                    alert(
+    `${e.title}
 
-Date: ${p.date || 'N/A'}
-Start Time: ${p.startTime || 'N/A'}
-Expected End: ${p.expectedEnd || 'N/A'}
-Location: ${p.location || 'N/A'}
-Position: ${p.position || 'N/A'}
-Status: ${p.status || 'N/A'}${p.status === 'dropped' && p.droppedBy ? ` by ${p.droppedBy}` : ''}
-Claimed By: ${p.claimedBy || 'Open'}
-Notes: ${p.notes || 'None'}
-
-Click OK to assign this shift to a worker or owner.`;
-
-                    if (confirm(message)) {
-                        openAssignModal(e.id);
-                    }
+    Date: ${p.date || 'N/A'}
+    Start Time: ${p.startTime || 'N/A'}
+    Expected End: ${p.expectedEnd || 'N/A'}
+    Location: ${p.location || 'N/A'}
+    Position: ${p.position || 'N/A'}
+    Status: ${p.status || 'N/A'}
+    Claimed By: ${p.claimedBy || 'Open'}
+    Notes: ${p.notes || 'None'}`
+                    );
                 }
             });
 
-            ownerCalendar.render();
+            pastCalendar.render();
+
         } catch (err) {
-            console.error('Failed to load owner shift calendar:', err);
+            console.error(
+                'Failed to load past shift calendar:',
+                err
+            );
         }
     }
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('shiftList').innerHTML =
-        '<p>Click "Show All Shifts" to load shifts.</p>';
-
-    loadSecurityLogs();
-    loadOwnerShiftCalendar();
-});
-    async function loadPastShiftCalendar() {
-    try {
-        const res = await fetch('/api/past-calendar', {
-    credentials: 'include'
-});
-
-        if (res.status === 401) {
-            location.href = 'login.html';
-            return;
-        }
-
-        if (!res.ok) {
-            console.error('Past calendar failed:', res.status);
-            return;
-        }
-
-        const events = await res.json();
-
-        // Get today's date in local YYYY-MM-DD format
-        const now = new Date();
-
-        const today =
-            now.getFullYear() + '-' +
-            String(now.getMonth() + 1).padStart(2, '0') + '-' +
-            String(now.getDate()).padStart(2, '0');
-
-        // Only keep shifts BEFORE today
-        const pastEvents = events.filter(event => {
-            const shiftDate =
-                event.extendedProps?.date ||
-                event.start?.substring(0, 10);
-
-            return shiftDate && shiftDate < today;
-        });
-
-        const calendarEl =
-            document.getElementById('pastShiftCalendar');
-
-        if (pastCalendar) {
-            pastCalendar.destroy();
-        }
-
-        pastCalendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            height: 'auto',
-
-            // Start the calendar around the most recent past shifts
-            initialDate: pastEvents.length
-                ? pastEvents
-                    .map(e =>
-                        e.extendedProps?.date ||
-                        e.start?.substring(0, 10)
-                    )
-                    .sort()
-                    .reverse()[0]
-                : undefined,
-
-            events: pastEvents,
-
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth'
-            },
-
-            eventDidMount(info) {
-                const status =
-                    info.event.extendedProps.status;
-
-                const claimedBy =
-                    info.event.extendedProps.claimedBy;
-
-                if (status === 'claimed' && claimedBy) {
-                    info.el.style.backgroundColor = '#2e7d32';
-                    info.el.style.borderColor = '#2e7d32';
-
-                } else if (status === 'dropped') {
-                    info.el.style.backgroundColor = '#f2c744';
-                    info.el.style.borderColor = '#f2c744';
-                    info.el.style.color = '#111';
-
-                } else {
-                    info.el.style.backgroundColor = '#e63946';
-                    info.el.style.borderColor = '#e63946';
-                }
-            },
-
-            eventClick(info) {
-                const e = info.event;
-                const p = e.extendedProps;
-
-                alert(
-`${e.title}
-
-Date: ${p.date || 'N/A'}
-Start Time: ${p.startTime || 'N/A'}
-Expected End: ${p.expectedEnd || 'N/A'}
-Location: ${p.location || 'N/A'}
-Position: ${p.position || 'N/A'}
-Status: ${p.status || 'N/A'}
-Claimed By: ${p.claimedBy || 'Open'}
-Notes: ${p.notes || 'None'}`
-                );
-            }
-        });
-
-        pastCalendar.render();
-
-    } catch (err) {
-        console.error(
-            'Failed to load past shift calendar:',
-            err
-        );
-    }
-}
 </script>
 </body>
 </html>
