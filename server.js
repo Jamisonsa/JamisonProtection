@@ -58,13 +58,20 @@ const Shift = mongoose.model('Shift', new mongoose.Schema({
     location: String,
     position: String,
     notes: String,
-    status: { type: String, enum: ['available','claimed','dropped'], default: 'available' },
+    status: {
+        type: String,
+        enum: ['available', 'claimed', 'dropped'],
+        default: 'available'
+    },
     claimedBy: String,
     droppedBy: String,
     dropReason: String,
     dropTime: String,
     alertSent: { type: Boolean, default: false },
-    seriesId: String
+    seriesId: String,
+
+    // Automatically becomes true after the shift has passed
+    isPast: { type: Boolean, default: false }
 }));
 
 
@@ -653,8 +660,21 @@ app.post('/api/shifts', requireLogin, isOwner, async (req, res) => {
     }
 });
 app.get('/api/view-all-shifts', requireLogin, isOwner, async (_req, res) => {
-  const shifts = await Shift.find();
-  res.json(shifts);
+    try {
+        const shifts = await Shift.find({
+            isPast: { $ne: true }
+        }).sort({
+            date: 1,
+            startTime: 1
+        });
+
+        res.json(shifts);
+    } catch (err) {
+        console.error('Error loading shifts:', err);
+        res.status(500).json({
+            message: 'Failed to load shifts.'
+        });
+    }
 });
 app.post('/api/claim', requireLogin, isWorker, async (req, res) => {
     const { shiftId } = req.body;
@@ -750,9 +770,12 @@ app.get('/api/worker-calendar', requireLogin, isWorker, async (req, res) => {
         const username = req.session.user.username;
 
         const shifts = await Shift.find({
-            status: { $in: ['available', 'dropped', 'claimed'] }
-        }).sort({ date: 1, startTime: 1 });
-
+            status: { $in: ['available', 'dropped', 'claimed'] },
+            isPast: { $ne: true }
+        }).sort({
+            date: 1,
+            startTime: 1
+        });
         const events = shifts.map(shift => {
             let type = 'available';
             let color = '#e63946';
@@ -929,8 +952,12 @@ app.get('/admin-panel.html', requireLogin, isOwner, (req, res) => {
 });
 app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
     try {
-        const shifts = await Shift.find().sort({ date: 1, startTime: 1 });
-
+const shifts = await Shift.find({
+    isPast: { $ne: true }
+}).sort({
+    date: 1,
+    startTime: 1
+});
         const events = shifts.map(shift => ({
             id: shift._id,
             title: shift.claimedBy
@@ -957,6 +984,52 @@ app.get('/api/owner-calendar', requireLogin, isOwner, async (_req, res) => {
         res.status(500).json({ message: 'Failed to load owner calendar.' });
     }
 });
+app.get('/api/past-calendar', requireLogin, isOwner, async (_req, res) => {
+    try {
+        const shifts = await Shift.find({
+            isPast: true
+        }).sort({
+            date: -1,
+            startTime: -1
+        });
+
+        const events = shifts.map(shift => ({
+            id: shift._id.toString(),
+
+            title: shift.claimedBy
+                ? `${shift.location} — ${shift.claimedBy}`
+                : `${shift.location} — Open`,
+
+            start: `${shift.date}T${shift.startTime}`,
+
+            extendedProps: {
+                date: shift.date,
+                startTime: shift.startTime,
+                expectedEnd: shift.expectedEnd || '',
+                location: shift.location || '',
+                position: shift.position || '',
+                notes: shift.notes || '',
+                status: shift.status,
+                claimedBy: shift.claimedBy || null,
+                droppedBy: shift.droppedBy || null,
+                dropReason: shift.dropReason || ''
+            }
+        }));
+
+        res.json(events);
+
+    } catch (err) {
+        console.error(
+            'Error loading past calendar:',
+            err
+        );
+
+        res.status(500).json({
+            message: 'Failed to load past calendar.'
+        });
+    }
+});
+
 app.get('/api/verify-owner', requireLogin, isOwner, (req, res) => {
   return res.sendStatus(200);
 });
@@ -1024,7 +1097,8 @@ app.get('/api/debug-session', (req, res) => {
 app.get('/api/shifts', requireLogin, isWorker, async (_req, res) => {
     const shifts = await Shift.find({
         claimedBy: null,
-        status: { $in: ['available', 'dropped'] }
+        status: { $in: ['available', 'dropped'] },
+        isPast: { $ne: true }
     }).sort({ date: 1, startTime: 1 });
 
     console.log(`👷 Worker fetched ${shifts.length} available/dropped shifts`);
@@ -1135,8 +1209,12 @@ app.post('/api/duplicate-shift/:id', requireLogin, isOwner, async (req, res) => 
 app.get('/api/my-shifts', requireLogin, isWorker, async (req, res) => {
     const shifts = await Shift.find({
         claimedBy: req.session.user.username,
-        status: 'claimed'
-    }).sort({ date: 1, startTime: 1 });
+        status: 'claimed',
+        isPast: { $ne: true }
+    }).sort({
+        date: 1,
+        startTime: 1
+    });
     res.json(shifts);
 });
 
@@ -1652,43 +1730,64 @@ Please log in and change your password as soon as possible.
         res.status(500).json({ message: 'Failed to hire applicant.' });
     }
 });
-async function deleteExpiredShifts() {
+async function moveExpiredShiftsToPast() {
     try {
         const now = new Date();
-        const shifts = await Shift.find();
+
+        const shifts = await Shift.find({
+            isPast: { $ne: true }
+        });
 
         for (const shift of shifts) {
             if (!shift.date || !shift.startTime) continue;
 
-            let deleteAfter;
+            let moveAfter;
 
-            // If expectedEnd is in 24-hour time like "17:00"
-            if (shift.expectedEnd && /^\d{2}:\d{2}$/.test(shift.expectedEnd)) {
-                deleteAfter = new Date(`${shift.date}T${shift.expectedEnd}:00`);
+            // Normal 24-hour end time, such as 17:00
+            if (
+                shift.expectedEnd &&
+                /^\d{2}:\d{2}$/.test(shift.expectedEnd)
+            ) {
+                moveAfter = new Date(
+                    `${shift.date}T${shift.expectedEnd}:00`
+                );
             } else {
-                // If expectedEnd is text like "Until Dismissed",
-                // delete the shift the next day at midnight
-                deleteAfter = new Date(`${shift.date}T23:59:59`);
+                // For "Until Dismissed", "5:00 PM", etc.
+                // keep the shift active until the end of the day.
+                moveAfter = new Date(
+                    `${shift.date}T23:59:59`
+                );
             }
 
-            if (deleteAfter < now) {
-                await Shift.findByIdAndDelete(shift._id);
-                console.log(`🗑 Deleted expired shift: ${shift.date} ${shift.startTime}`);
+            if (moveAfter < now) {
+                shift.isPast = true;
+                await shift.save();
+
+                console.log(
+                    `📁 Moved shift to past: ${shift.date} ${shift.startTime}`
+                );
             }
         }
     } catch (err) {
-        console.error('Expired shift cleanup error:', err);
+        console.error(
+            'Past shift cleanup error:',
+            err
+        );
     }
 }
 
-// Run every hour
-setInterval(deleteExpiredShifts, 60 * 60 * 1000);
+// Check for completed shifts every hour
+setInterval(
+    moveExpiredShiftsToPast,
+    60 * 60 * 1000
+);
 
-// Also run once when server starts
-deleteExpiredShifts();
+// Check immediately when the server starts
+moveExpiredShiftsToPast();
+
 // ────── Start Server ──────
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
 
 
