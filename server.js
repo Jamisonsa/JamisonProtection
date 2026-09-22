@@ -695,7 +695,7 @@ async function notifyOwnersOfDroppedShift(shift, reason) {
     try {
         await transporter.sendMail({
             from: `"Jamison Protection Shifts" <${process.env.CONTACT_EMAIL_USER}>`,
-            to: 'jamisonprotectionllc@gmail.com,deputyfirstclass@gmail.com',
+            to: 'jamisonprotectionllc@gmail.com',
             subject: `⚠️ Shift Dropped by ${shift.droppedBy}`,
             text:
 `A shift was dropped and needs attention.
